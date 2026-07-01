@@ -14,7 +14,7 @@ class PipelineContext(BaseModel):
     Stages receive this read-only context. It is never mutated.
     Instead, a ContextReducer generates a new instance.
     """
-    model_config = {"frozen": True}
+    model_config = {"frozen": True, "arbitrary_types_allowed": True}
     
     project_manifest: ProjectManifest
     story_bible: Optional[StoryBible] = None
