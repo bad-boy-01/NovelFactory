@@ -1,6 +1,21 @@
 from pydantic import BaseModel
 from typing import List, Optional
-from .base import DomainModel
+from core.domain.base import DomainModel
+
+class SubjectAST(BaseModel):
+    description: str = ""
+
+class CharacterAST(BaseModel):
+    name: str = ""
+    visual_dna: str = ""
+    clothing: str = ""
+    action: str = ""
+    emotion: str = ""
+
+class EnvironmentAST(BaseModel):
+    location: str = ""
+    time_of_day: str = ""
+    weather: str = ""
 
 class CameraAST(BaseModel):
     type: str = ""
@@ -9,16 +24,39 @@ class CameraAST(BaseModel):
     distance: str = ""
     movement: str = ""
 
-class PromptAST(BaseModel):
-    subject: str = ""
-    characters: List[str] = []
-    environment: str = ""
-    camera: CameraAST = CameraAST()
-    lighting: str = ""
-    composition: str = ""
+class LightingAST(BaseModel):
     style: str = ""
-    negative: str = ""
-    technical: str = ""
+
+class CompositionAST(BaseModel):
+    style: str = ""
+
+class MoodAST(BaseModel):
+    mood: str = ""
+
+class QualityAST(BaseModel):
+    tags: List[str] = []
+
+class TechnicalAST(BaseModel):
+    steps: int = 25
+    cfg: float = 7.0
+    sampler: str = "Euler a"
+    width: int = 1024
+    height: int = 1024
+
+class NegativeAST(BaseModel):
+    tags: List[str] = []
+
+class PromptAST(BaseModel):
+    subject: SubjectAST = SubjectAST()
+    characters: List[CharacterAST] = []
+    environment: EnvironmentAST = EnvironmentAST()
+    camera: CameraAST = CameraAST()
+    lighting: LightingAST = LightingAST()
+    composition: CompositionAST = CompositionAST()
+    mood: MoodAST = MoodAST()
+    quality: QualityAST = QualityAST()
+    technical: TechnicalAST = TechnicalAST()
+    negative: NegativeAST = NegativeAST()
 
 class PromptManifestEntry(BaseModel):
     prompt_id: str
@@ -26,11 +64,7 @@ class PromptManifestEntry(BaseModel):
     shot_id: str
     ast: PromptAST
     seed: int
-    model_target: str = "sd1.5"
-    width: int = 768
-    height: int = 768
-    steps: int = 25
-    cfg: float = 7.0
+    model_target: str = "sdxl"
     
 class PromptManifest(DomainModel):
     prompts: List[PromptManifestEntry] = []

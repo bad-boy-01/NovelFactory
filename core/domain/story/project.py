@@ -1,13 +1,28 @@
 from pydantic import BaseModel
-from .base import DomainModel
+from typing import Optional
+from core.domain.base import DomainModel
+from core.domain.story.bible import StoryBible
+from core.domain.story.style import StyleGuide
+from core.domain.scene.manifest import SceneManifest
+from core.domain.prompt.ast import PromptManifest
+from core.domain.timeline.models import Timeline
+from core.domain.assets.registry import AssetRegistry
 
-class QualityPreset(BaseModel):
-    resolution: tuple[int, int] = (1080, 1920)
-    inference_steps: int = 20
-    cfg_scale: float = 7.0
-
-class ProjectManifest(DomainModel):
+class ProjectMetadata(BaseModel):
     project_name: str
     dataset_id: str
+    author: str = ""
+    target_resolution: str = "1920x1080"
+    target_fps: int = 24
+    
+class ProjectManifest(DomainModel):
+    metadata: ProjectMetadata
     source_text: str = ""
-    quality_preset: QualityPreset = QualityPreset()
+    
+    # Derived manifests
+    bible: Optional[StoryBible] = None
+    style: Optional[StyleGuide] = None
+    scenes: Optional[SceneManifest] = None
+    prompts: Optional[PromptManifest] = None
+    timeline: Optional[Timeline] = None
+    registry: Optional[AssetRegistry] = None
