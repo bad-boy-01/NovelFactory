@@ -77,22 +77,34 @@ def main():
     diffusion_provider = DiffusionProvider(config=diff_config)
     renderer_provider = FFmpegVideoRenderer()
 
+    # Import new stages
+    from ai.reasoning.scene_splitter import SceneSplitterStage
+    from ai.planning.shot_planner import ShotPlannerStage
+    from ai.planning.camera_planner import CameraPlannerStage
+    from ai.planning.validator import ValidatorStage
+    from ai.planning.timeline_builder import TimelineBuilderStage
+    from ai.generation.image_stage import DiffusionRendererStage
+    from ai.generation.rendering_stage import FFmpegAssemblyStage
+
     # Stages need to expose get_providers for Executor lifecycle management
     sb_stage = StoryBibleGeneratorStage(llm_provider)
-    setattr(sb_stage, 'get_providers', lambda: [llm_provider])
-    
+    scene_stage = SceneSplitterStage(llm_provider)
+    shot_stage = ShotPlannerStage(llm_provider)
+    camera_stage = CameraPlannerStage()
     prompt_stage = PromptBuilderStage()
-    setattr(prompt_stage, 'get_providers', lambda: [])
-    
-    img_stage = ImageGenerationStage(provider=diffusion_provider, cache=cache_provider)
-    setattr(img_stage, 'get_providers', lambda: [diffusion_provider])
-    
-    render_stage = RenderingStage(renderer=renderer_provider, output_file="workspace/008_video.mp4")
-    setattr(render_stage, 'get_providers', lambda: [renderer_provider])
+    valid_stage = ValidatorStage()
+    timeline_stage = TimelineBuilderStage()
+    img_stage = DiffusionRendererStage(diffusion_provider=diffusion_provider)
+    render_stage = FFmpegAssemblyStage()
 
     stages_map = {
         "story_bible": sb_stage,
+        "scene": scene_stage,
+        "shot": shot_stage,
+        "camera": camera_stage,
         "prompt": prompt_stage,
+        "validate": valid_stage,
+        "timeline": timeline_stage,
         "diffusion": img_stage,
         "render": render_stage
     }
