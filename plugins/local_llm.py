@@ -16,27 +16,42 @@ class LocalLLMProvider(LLMProvider):
     # -------------------------
     # LOAD MODEL (VRAM CONTROLLED)
     # -------------------------
-    def load(self):
-        print("[LLM] Loading model...")
-
+    def initialize(self):
+        print("[LLM] Initializing tokenizer and config (No VRAM penalty)...")
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id, trust_remote_code=True)
+        # In a real system, you might load config here too.
 
+    def load(self):
+        print("[LLM] Loading model weights into VRAM...")
+        if not self.tokenizer:
+            self.initialize()
+            
+        from transformers import BitsAndBytesConfig
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_use_double_quant=True
+        )
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_id,
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            quantization_config=bnb_config,
             device_map="auto",
             trust_remote_code=True
         )
 
-    # -------------------------
-    # UNLOAD (CRITICAL FOR KAGGLE)
-    # -------------------------
     def unload(self):
-        print("[LLM] Unloading model...")
-        del self.model
-        del self.tokenizer
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        from core.utils.vram import flush_vram
+        print("[LLM] Unloading model weights...")
+        if self.model:
+            del self.model
+            self.model = None
+        flush_vram("LLM unloaded")
+
+    def shutdown(self):
+        print("[LLM] Shutting down tokenizer...")
+        if self.tokenizer:
+            del self.tokenizer
+            self.tokenizer = None
 
     # -------------------------
     # JSON GENERATION CORE

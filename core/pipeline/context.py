@@ -11,8 +11,11 @@ from core.domain.story import Chapter, Scene
 class PipelineContext(BaseModel):
     """
     The central state object that flows through the execution pipeline.
-    Stages mutate this context rather than passing arbitrary arguments.
+    Stages receive this read-only context. It is never mutated.
+    Instead, a ContextReducer generates a new instance.
     """
+    model_config = {"frozen": True}
+    
     project_manifest: ProjectManifest
     story_bible: Optional[StoryBible] = None
     
