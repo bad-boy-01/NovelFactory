@@ -14,8 +14,9 @@ class StoryBibleGeneratorStage:
             "characters": [
                 {
                     "name": "string",
-                    "appearance": "string",
-                    "outfit": "string"
+                    "visual_dna": "string",
+                    "outfit": "string",
+                    "color_palette": "string"
                 }
             ]
         }
@@ -29,7 +30,7 @@ class StoryBibleGeneratorStage:
         
         result_dict = self.llm.generate_json(prompt, schema)
         
-        chars = [CharacterReference(**c) for c in result_dict.get("characters", [])]
+        chars = {c["name"]: CharacterReference(**c) for c in result_dict.get("characters", [])}
         bible = StoryBible(characters=chars)
         
         node = ExecutionNode(artifact=bible, stage_name="StoryBibleGeneratorStage")
