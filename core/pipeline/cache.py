@@ -3,7 +3,7 @@ import shutil
 from pathlib import Path
 from typing import Optional
 from dataclasses import asdict
-from core.domain.asset import GeneratedImage, ProvenanceRecord
+from core.domain.assets.execution import GeneratedImage, ProvenanceRecord
 
 
 class CacheProvider:

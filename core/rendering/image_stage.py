@@ -1,8 +1,8 @@
 from core.pipeline.stage import PipelineStage, StageResult
-from core.domain.asset import ExecutionNode
-from core.domain.prompt import PromptManifest
-from core.domain.registry import AssetRegistry, Asset
-from core.pipeline.render_queue import RenderQueue
+from core.domain.assets.execution import ExecutionNode
+from core.domain.prompt.ast import PromptManifest
+from core.domain.assets.registry import AssetRegistry, Asset
+from core.rendering.render_queue import RenderQueue
 import logging
 import os
 

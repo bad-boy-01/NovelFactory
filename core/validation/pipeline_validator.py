@@ -1,7 +1,7 @@
 from core.pipeline.stage import PipelineStage, StageResult
-from core.domain.asset import ExecutionNode
-from core.domain.prompt import PromptManifest
-from core.domain.scene import ShotManifest
+from core.domain.assets.execution import ExecutionNode
+from core.domain.prompt.ast import PromptManifest
+from core.domain.scene.manifest import ShotManifest
 import logging
 
 logger = logging.getLogger(__name__)

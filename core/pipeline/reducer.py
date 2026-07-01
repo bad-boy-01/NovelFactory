@@ -1,6 +1,6 @@
 from core.pipeline.context import PipelineContext
 from core.pipeline.stage import StageResult
-from core.domain.bible import StoryBible
+from core.domain.story.bible import StoryBible
 
 class ContextReducer:
     """

@@ -1,5 +1,5 @@
 from pathlib import Path
-from core.domain.project import ProjectManifest
+from core.domain.story.project import ProjectManifest
 
 class ProjectBuilder:
     def __init__(self, projects_dir: Path, datasets_dir: Path):

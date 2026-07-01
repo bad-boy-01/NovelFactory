@@ -4,7 +4,7 @@ import datetime
 from pathlib import Path
 from diffusers import StableDiffusionPipeline
 from plugins.interfaces import ImageGeneratorProvider, DiffusionConfig
-from core.domain.asset import GeneratedImage, ProvenanceRecord
+from core.domain.assets.execution import GeneratedImage, ProvenanceRecord
 
 
 class DiffusionProvider(ImageGeneratorProvider):

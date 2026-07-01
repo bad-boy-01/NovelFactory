@@ -1,6 +1,6 @@
 from core.pipeline.stage import PipelineStage, StageResult
-from core.domain.asset import ExecutionNode
-from core.domain.scene import ShotManifest
+from core.domain.assets.execution import ExecutionNode
+from core.domain.scene.manifest import ShotManifest
 import copy
 
 class CameraPlannerStage(PipelineStage):

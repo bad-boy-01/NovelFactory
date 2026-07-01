@@ -1,6 +1,6 @@
 from core.pipeline.stage import StageResult
-from core.domain.asset import ExecutionNode
-from core.domain.bible import StoryBible, CharacterReference
+from core.domain.assets.execution import ExecutionNode
+from core.domain.story.bible import StoryBible, CharacterReference
 
 class StoryBibleGeneratorStage:
     def __init__(self, llm_provider):

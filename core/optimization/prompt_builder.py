@@ -1,8 +1,8 @@
 from core.pipeline.stage import PipelineStage, StageResult
-from core.domain.asset import ExecutionNode
-from core.domain.prompt import PromptManifest, PromptManifestEntry, PromptAST, CameraAST
-from core.domain.scene import ShotManifest
-from core.domain.bible import StoryBible
+from core.domain.assets.execution import ExecutionNode
+from core.domain.prompt.ast import PromptManifest, PromptManifestEntry, PromptAST, CameraAST
+from core.domain.scene.manifest import ShotManifest
+from core.domain.story.bible import StoryBible
 import hashlib
 
 class PromptBuilderStage(PipelineStage):

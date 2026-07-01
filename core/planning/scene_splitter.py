@@ -1,6 +1,6 @@
 from core.pipeline.stage import PipelineStage, StageResult
-from core.domain.asset import ExecutionNode
-from core.domain.scene import SceneManifest, Scene, Beat
+from core.domain.assets.execution import ExecutionNode
+from core.domain.scene.manifest import SceneManifest, Scene, Beat
 import json
 import logging
 import hashlib

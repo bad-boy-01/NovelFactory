@@ -2,10 +2,10 @@ from typing import Dict, Optional, List
 from uuid import UUID
 from pydantic import BaseModel, Field
 
-from core.domain.project import ProjectManifest
-from core.domain.bible import StoryBible
-from core.domain.asset import ExecutionNode
-from core.domain.prompt import DeclarativePrompt
+from core.domain.story.project import ProjectManifest
+from core.domain.story.bible import StoryBible
+from core.domain.assets.execution import ExecutionNode
+from core.domain.prompt.ast import DeclarativePrompt
 from core.domain.story import Chapter, Scene
 
 class PipelineContext(BaseModel):

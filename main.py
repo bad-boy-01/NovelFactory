@@ -5,17 +5,17 @@ from pathlib import Path
 import shutil
 
 from core.pipeline.context import PipelineContext
-from core.domain.project import ProjectManifest
+from core.domain.story.project import ProjectManifest
 from plugins.local_llm import LocalLLMProvider
-from ai.reasoning.story_bible import StoryBibleGeneratorStage
+from core.planning.story_bible_stage import StoryBibleGeneratorStage
 from plugins.local_diffusion import DiffusionProvider
 from plugins.interfaces import DiffusionConfig
-from ai.generation.image_stage import ImageGenerationStage
+from core.rendering.image_stage import ImageGenerationStage
 from core.pipeline.cache import CacheProvider
-from ai.prompting.prompt_stage import PromptBuilderStage
+from core.optimization.prompt_builder import PromptBuilderStage
 from plugins.ffmpeg_renderer import FFmpegVideoRenderer
-from ai.generation.rendering_stage import RenderingStage
-from core.pipeline.executor import SequentialExecutor
+from core.rendering.assembly_stage import RenderingStage
+from core.rendering.executor import SequentialExecutor
 from core.contracts.router import ContractRouter
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -45,7 +45,7 @@ def main():
         from core.pipeline.reducer import ContextReducer
         from core.pipeline.stage import StageResult
         reducer = ContextReducer()
-        from core.domain.asset import ExecutionNode
+        from core.domain.assets.execution import ExecutionNode
         dummy_result = StageResult(artifact="dummy", execution_node=ExecutionNode(artifact="dummy", stage_name="validate"), metrics={}, metadata={})
         new_ctx = reducer.reduce(context, dummy_result)
         assert new_ctx is not context, "Reducer mutated context instead of copying!"
@@ -78,13 +78,13 @@ def main():
     renderer_provider = FFmpegVideoRenderer()
 
     # Import new stages
-    from ai.reasoning.scene_splitter import SceneSplitterStage
-    from ai.planning.shot_planner import ShotPlannerStage
-    from ai.planning.camera_planner import CameraPlannerStage
-    from ai.planning.validator import ValidatorStage
-    from ai.planning.timeline_builder import TimelineBuilderStage
-    from ai.generation.image_stage import DiffusionRendererStage
-    from ai.generation.rendering_stage import FFmpegAssemblyStage
+    from core.planning.scene_splitter import SceneSplitterStage
+    from core.planning.shot_planner import ShotPlannerStage
+    from core.planning.camera_planner import CameraPlannerStage
+    from core.validation.pipeline_validator import ValidatorStage
+    from core.planning.timeline_builder import TimelineBuilderStage
+    from core.rendering.image_stage import DiffusionRendererStage
+    from core.rendering.assembly_stage import FFmpegAssemblyStage
 
     # Stages need to expose get_providers for Executor lifecycle management
     sb_stage = StoryBibleGeneratorStage(llm_provider)

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from plugins.interfaces import LLMProvider, ImageGeneratorProvider, EvaluatorPlugin, VideoRendererProvider
 from core.pipeline.context import PipelineContext
-from core.domain.asset import Asset, EvaluationResult
+from core.domain.assets.execution import Asset, EvaluationResult
 
 logger = logging.getLogger(__name__)
 

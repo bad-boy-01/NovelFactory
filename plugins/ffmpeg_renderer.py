@@ -1,6 +1,6 @@
 import subprocess
 from pathlib import Path
-from core.domain.asset import FrameManifest
+from core.domain.assets.execution import FrameManifest
 from plugins.interfaces import VideoRendererProvider
 
 class FFmpegVideoRenderer(VideoRendererProvider):
