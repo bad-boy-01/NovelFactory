@@ -9,4 +9,5 @@ class QualityPreset(BaseModel):
 class ProjectManifest(DomainModel):
     project_name: str
     dataset_id: str
+    source_text: str = ""
     quality_preset: QualityPreset = QualityPreset()

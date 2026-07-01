@@ -34,7 +34,7 @@ def main():
 
     if args.stage == "validate":
         logger.info("[VALIDATE] Running architectural sanity check...")
-        manifest = ProjectManifest(title="Sanity", author="Test", source_text="test")
+        manifest = ProjectManifest(project_name="Sanity", dataset_id="test", source_text="test")
         context = PipelineContext(project_manifest=manifest)
         llm = LocalLLMProvider()
         cache = CacheProvider(".cache")
@@ -61,7 +61,7 @@ def main():
     with open(args.novel, "r", encoding="utf-8") as f:
         novel_text = f.read()
 
-    manifest = ProjectManifest(title="Milestone1", author="Tester", source_text=novel_text)
+    manifest = ProjectManifest(project_name="Milestone1", dataset_id="local_run", source_text=novel_text)
     context = PipelineContext(project_manifest=manifest)
 
     llm_provider = LocalLLMProvider() 
