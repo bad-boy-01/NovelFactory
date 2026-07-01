@@ -1,18 +1,36 @@
-from typing import Optional, List, Dict
 from pydantic import BaseModel
+from typing import List, Optional
 from .base import DomainModel
 
-class DeclarativePrompt(DomainModel):
-    """
-    Abstract Syntax Tree representation of a prompt before compilation.
-    """
-    characters: Dict[str, str] = {}  # e.g., {"Alice": "School uniform"}
-    expression: str = ""
-    camera: str = ""
-    lighting: str = ""
+class CameraAST(BaseModel):
+    type: str = ""
+    lens: str = ""
+    angle: str = ""
+    distance: str = ""
+    movement: str = ""
+
+class PromptAST(BaseModel):
+    subject: str = ""
+    characters: List[str] = []
     environment: str = ""
+    camera: CameraAST = CameraAST()
+    lighting: str = ""
+    composition: str = ""
     style: str = ""
-    custom_additions: List[str] = []
-    negative_constraints: List[str] = []
+    negative: str = ""
+    technical: str = ""
+
+class PromptManifestEntry(BaseModel):
+    prompt_id: str
+    scene_id: str
+    shot_id: str
+    ast: PromptAST
+    seed: int
+    model_target: str = "sd1.5"
+    width: int = 768
+    height: int = 768
+    steps: int = 25
+    cfg: float = 7.0
     
-    compiled_text: str = "" # The final model-ready string
+class PromptManifest(DomainModel):
+    prompts: List[PromptManifestEntry] = []
