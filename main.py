@@ -55,12 +55,18 @@ def main():
     Path("workspace").mkdir(exist_ok=True)
     Path("debug").mkdir(exist_ok=True)
 
-    if not Path(args.novel).exists():
+    novel_path = Path(args.novel)
+    if not novel_path.exists():
         with open(args.novel, "w") as f:
             f.write("Alice stood in the dark forest, her blue dress illuminated by moonlight.")
 
-    with open(args.novel, "r", encoding="utf-8") as f:
-        novel_text = f.read()
+    if novel_path.suffix == '.docx':
+        import docx
+        doc = docx.Document(args.novel)
+        novel_text = "\\n".join([para.text for para in doc.paragraphs])
+    else:
+        with open(args.novel, "r", encoding="utf-8") as f:
+            novel_text = f.read()
 
     manifest = ProjectManifest(project_name="Milestone1", dataset_id="local_run", source_text=novel_text)
     context = PipelineContext(project_manifest=manifest)
