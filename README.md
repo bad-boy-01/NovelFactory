@@ -1,62 +1,100 @@
-# NovelFactory
+# NovelFactory: Generative Compiler & Control System
 
-NovelFactory is a pipeline-based generative compiler designed to automate the conversion of text (such as novels or scripts) into rendered videos ("visual novels"). It breaks down stories into chapters, scenes, and beats, uses AI to extract character consistency rules (a "Story Bible"), compiles stylistic prompts, generates images, evaluates them for quality, and finally stitches them together into an MP4 video sequence.
-
-## How it Works
-
-The system operates as a **replayable generative compiler** with a closed-loop feedback mechanism:
-
-1. **Dataset Parsing (`core/pipeline/dataset_provider.py`)**: Ingests raw text and splits it into an Abstract Syntax Tree of Chapters, Scenes, and Beats.
-2. **Story Bible Generation (`ai/reasoning/story_bible.py`)**: Uses an LLM to analyze the narrative and extract global visual continuity rules (e.g., character outfits, DNA, color palettes).
-3. **Prompt Compilation (`ai/prompting/compiler.py`)**: Cross-references scene beats with the Story Bible and selected stylistic `PromptPack` to generate deterministic prompts.
-4. **Media Generation (`ai/generation/image.py`)**: Pluggable architecture that calls out to Image Generation models (like Stable Diffusion) while recording exact generation lineage (Provenance Graph).
-5. **Multi-Signal Evaluation (`ai/reasoning/evaluator.py`)**: Grades generated assets using multiple signals (CLIP, face embeddings) and decides whether to retry based on dynamic drift budgets.
-6. **Video Rendering (`ai/generation/rendering.py`)**: Stitches the final approved images into video chapters.
-
-The core architecture treats the pipeline state (`PipelineContext`) as a mutable/event-sourced graph where each stage fingerprint ensures perfect reproducibility and provenance tracking.
+NovelFactory is not just a media pipeline—it is a **replayable generative compiler** and a **closed-loop generative operating system**. It is designed to solve the fundamental problem of converting unstructured text (like novels or scripts) into temporally and visually coherent rendered videos ("visual novels") by treating generative failures as measurable system drift rather than isolated errors.
 
 ---
 
-## Running in Kaggle
+## 1. Core Philosophy
 
-NovelFactory is designed to be run in cloud environments with GPU access like Kaggle. Since the core relies on abstract plugin interfaces, you will need to provide concrete implementations for the `ImageGeneratorProvider` and `LLMProvider` (e.g., using Hugging Face `diffusers` and `transformers`).
+In traditional generative systems, the architecture assumes *same input → same output*. However, under real LLM and Diffusion variance, this breaks down. NovelFactory shifts the paradigm from deterministic pipelines to **stochastic execution engines with policy-driven correction loops**.
 
-### Kaggle Cell Commands
+Instead of manually debugging images, NovelFactory is built on a **Generative Observability Stack** that formalizes:
+* **Event-Sourced Execution:** Turning the pipeline into a replayable computation graph.
+* **Multi-Signal Evaluation:** Using calibrated signals (CLIP + Face Embeddings + Attribute Classifiers) rather than generic thresholds.
+* **Drift Budgets:** Allocating compute tolerance dynamically across Narrative, Visual, and Stylistic axes.
 
-Run the following commands in Kaggle notebook cells to get started:
+---
 
-**1. Clone the repository and navigate to the directory:**
-```python
-!git clone https://github.com/bad-boy-01/NovelFactory.git
-%cd NovelFactory
-```
+## 2. Architecture: The Generative Compiler
 
-**2. Install dependencies:**
-The core framework requires `pydantic`. You will also need to install the dependencies for whatever AI models you plan to use as plugins.
-```python
-!pip install pydantic
-# Install your preferred provider dependencies (e.g., diffusers, torch)
-!pip install diffusers transformers torch accelerate
-```
+The system breaks down narratives similar to how a compiler processes source code:
 
-**3. Install specific framework dependencies:**
-```python
-!pip install -r requirements.txt
-```
+1. **AST Construction (`DatasetProvider`)**: Parses `.txt` or `.docx` into an Abstract Syntax Tree (AST) of Chapters, Scenes, and Beats.
+2. **Semantic Enrichment (`StoryBibleGeneratorStage`)**: Acts as global memory. It uses an LLM to extract character consistency rules (Visual DNA, Outfits, Color Palettes).
+3. **IR Transformation (`PromptCompilerStage`)**: Cross-references narrative beats with the Story Bible and cinematic stylistic `PromptPack` policies to generate an Intermediate Representation (`DeclarativePrompt`).
+4. **Lowering & Execution (`ImageGenerationStage`)**: Calls out to Image Generation models (e.g., Stable Diffusion) while recording an exact `ProvenanceGraph` (the debug symbol table for generated assets).
+5. **Linking & Packaging (`RenderingStage`)**: Stitches the approved latent frames together into an MP4 sequence.
 
-**4. Run the Pipeline CLI:**
-NovelFactory now includes a full end-to-end execution harness via `main.py`. It supports reading directly from `.txt` and `.docx` script files.
+---
 
-To run the pipeline in **mock mode** (which simulates image generation, LLM reasoning, and evaluation to verify orchestration flow without requiring GPUs or API keys):
+## 3. The Control Policy Layer (Self-Regulation)
+
+A naive pipeline relies on a `score → threshold → retry` loop. NovelFactory implements a **Control Policy Layer** to actively regulate the system.
+
+### A. Dynamic Drift Budgets
+Drift budgets act as a resource allocation scheduler. For example:
+* **Chapter 1 (World-building):** The scheduler enforces strict **Identity Lock**, allocating high compute retry budgets to ensure character faces perfectly match the Story Bible.
+* **Chapter 3 (Action Sequence):** The scheduler relaxes Identity Lock in favor of **Motion Diversity**, allowing slight semantic drift to prioritize cinematic pacing.
+
+### B. Multi-Signal Calibration
+Raw CLIP scores are easily overpowered by stylistic tokens. The `EvaluationCalibrationLayer` calculates a weighted consistency vector:
+* **Semantic Alignment (CLIP):** General scene vibe.
+* **Identity Lock (Face Embeddings):** Identity stability (e.g., ArcFace).
+* **Attribute Classifiers:** Structured truth (e.g., "Is the uniform red?").
+
+### C. Failure Taxonomy & Interventions
+When an asset fails evaluation, the system diagnoses the root cause rather than guessing:
+* **Identity Drift (Prompt Dilution):** *Intervention:* Mutate the AST to drop 20% of stylistic weights and retry.
+* **Identity Drift (Model Incapacity):** *Intervention:* Swap the diffusion provider or inject stronger ControlNet conditioning.
+* **Prompt Impossibility:** *Intervention:* Hard stop circuit breaker to prevent infinite retry loops.
+
+---
+
+## 4. The Event-Sourced Generative Graph
+
+To achieve true reproducibility across a stochastic system, `PipelineContext` is not randomly mutated. Every execution emits a `StageExecutionEvent` containing:
+* Input hash state.
+* The explicit mutation log.
+* Artifact references and `ProvenanceGraph` linkage.
+
+This allows developers to run **Cross-Run Comparisons (Regression Tests)**. If you upgrade from Diffusion Model V1 to V2, you can replay the exact deterministic event graph and visualize the shift in prompt phase space stability.
+
+---
+
+## 5. Usage & Execution Harness
+
+NovelFactory provides a full CLI integration harness. It allows you to run a complete "story → video" pipeline in one command to verify orchestration correctness.
+
+### Installation
 
 ```bash
-!python main.py --project-name MyProject --script-file my_script.txt --mode mock
+git clone https://github.com/bad-boy-01/NovelFactory.git
+cd NovelFactory
+pip install -r requirements.txt
 ```
 
-*(Note: `--mode real` is currently a placeholder for when you inject your own concrete plugin implementations for Image Generators and LLMs.)*
+*(Note: The core framework requires `pydantic` and `python-docx`. Real execution requires you to install specific plugin dependencies like `diffusers` or `transformers`.)*
 
-The CLI will automatically:
-- Create a `workspace/` directory structure.
-- Ingest your script into `workspace/datasets/MyProject/novel.txt`.
-- Execute the Story Bible generator, Prompt Compiler, Image Generator, and Video Renderer.
-- Output a traced summary of the assets generated and any simulated drift/evaluation failures.
+### Running the CLI (Mock vs Real Mode)
+
+To run the pipeline and test the orchestration flow, failure taxonomy, and traceability without requiring a GPU, use **Mock Mode**. The system will simulate image generation, LLM reasoning, and inject occasional evaluation failures to test the retry loops.
+
+```bash
+python main.py --project-name MyProject --script-file my_script.txt --mode mock
+```
+
+**What happens:**
+1. The CLI creates an isolated `./workspace/` structure.
+2. Ingests and normalizes your script into `./workspace/datasets/MyProject/novel.txt`.
+3. Runs the full compiler pipeline.
+4. Outputs a final telemetry summary outlining generated assets and simulated drift/evaluation failures.
+
+### Extending with Plugins
+
+To move from Mock Mode to Production, implement the core interfaces defined in `plugins/interfaces.py`:
+* `LLMProvider`
+* `ImageGeneratorProvider`
+* `EvaluatorPlugin`
+* `VideoRendererProvider`
+
+By fulfilling these contracts, the Generative Compiler will automatically orchestrate, evaluate, and self-regulate your models.
