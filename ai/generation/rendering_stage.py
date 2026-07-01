@@ -1,58 +1,88 @@
+from core.pipeline.stage import PipelineStage, StageResult
+from core.domain.asset import ExecutionNode
+from core.domain.timeline import Timeline
+from core.pipeline.render_queue import RenderQueue
+import os
 import json
-from pathlib import Path
-from dataclasses import asdict
-from core.pipeline.stage import StageResult
-from core.domain.asset import ExecutionNode, FrameManifest, FrameManifestEntry
-from plugins.interfaces import VideoRendererProvider
+import logging
+import subprocess
 
-class RenderingStage:
-    def __init__(self, renderer: VideoRendererProvider, output_file: str = "workspace/008_video.mp4"):
-        self.renderer = renderer
-        self.output_file = Path(output_file)
-        self.output_file.parent.mkdir(parents=True, exist_ok=True)
-        
+logger = logging.getLogger(__name__)
+
+class FFmpegAssemblyStage(PipelineStage):
+    def __init__(self, output_dir="workspace"):
+        self.output_dir = output_dir
+
     def get_providers(self) -> list:
-        return [self.renderer]
+        return []
         
     def execute(self, context) -> StageResult:
-        frames = []
-        frame_idx = 0
-        
-        for node in context.execution_nodes:
-            from core.domain.asset import GeneratedImage
-            if isinstance(node.artifact, GeneratedImage):
-                entry = FrameManifestEntry(
-                    frame_index=frame_idx,
-                    beat_id=f"beat_{frame_idx}",
-                    image_path=node.artifact.image_path,
-                    prompt_hash=node.artifact.prompt_hash,
-                    asset_id=f"asset_{frame_idx}"
-                )
-                frames.append(entry)
-                frames.append(FrameManifestEntry(frame_index=frame_idx+1, beat_id=f"beat_{frame_idx+1}", image_path=node.artifact.image_path, prompt_hash=node.artifact.prompt_hash, asset_id=f"asset_{frame_idx}"))
-                frames.append(FrameManifestEntry(frame_index=frame_idx+2, beat_id=f"beat_{frame_idx+2}", image_path=node.artifact.image_path, prompt_hash=node.artifact.prompt_hash, asset_id=f"asset_{frame_idx}"))
-                frame_idx += 3
+        timeline = None
+        for node in context.execution_nodes.values():
+            if isinstance(node.artifact, Timeline):
+                timeline = node.artifact
+                break
                 
-        manifest = FrameManifest(frames=frames)
-        
-        manifest_path = self.output_file.parent / "007_frame_manifest.json"
-        with open(manifest_path, "w") as f:
-            manifest_dict = [asdict(e) for e in manifest.frames]
-            for d in manifest_dict:
-                d["image_path"] = str(d["image_path"])
-            json.dump(manifest_dict, f, indent=2)
+        if not timeline:
+            raise ValueError("FFmpegAssembly: Missing Timeline.")
             
-        output_path = self.renderer.render_video(
-            manifest=manifest, 
-            audio_paths=[],
-            output_path=self.output_file
-        )
+        logger.info(f"Assembling video from Timeline ({len(timeline.items)} items)...")
         
-        node = ExecutionNode(artifact=output_path, stage_name="RenderingStage")
+        # 1. Create concat file for FFmpeg
+        concat_file = os.path.join(self.output_dir, "concat.txt")
+        images = sorted([f for f in os.listdir(self.output_dir) if f.endswith(".png")])
+        
+        if not images:
+            raise ValueError("FFmpegAssembly: No rendered assets found.")
+            
+        with open(concat_file, "w", encoding="utf-8") as f:
+            for img in images:
+                f.write(f"file '{img}'\n")
+                f.write(f"duration 4.0\n") # Static duration for demo
+                
+        output_video = os.path.join(self.output_dir, "final_video.mp4")
+        srt_file = os.path.join(self.output_dir, "subtitles.srt")
+        
+        # 2. FFmpeg command: Subtitle multiplexing
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", concat_file
+        ]
+        
+        if os.path.exists(srt_file):
+            # Escape path for FFmpeg filter
+            srt_escaped = srt_file.replace("\\", "/").replace(":", "\\:")
+            cmd.extend(["-vf", f"subtitles={srt_escaped}"])
+            
+        cmd.extend([
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            output_video
+        ])
+        
+        logger.info(f"Running FFmpeg: {' '.join(cmd)}")
+        try:
+            subprocess.run(cmd, check=True, capture_output=True)
+            logger.info(f"Successfully rendered video: {output_video}")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"FFmpeg failed: {e.stderr.decode()}")
+            raise e
+            
+        # 3. Cleanup: Delete intermediate PNGs and VACUUM
+        logger.info("Cleaning up intermediate assets...")
+        for img in images:
+            os.remove(os.path.join(self.output_dir, img))
+            
+        RenderQueue().vacuum()
+        logger.info("RenderQueue vacuumed.")
+        
+        node = ExecutionNode(artifact=timeline, stage_name="FFmpegAssemblyStage")
         
         return StageResult(
-            artifact=output_path,
+            artifact=timeline,
             execution_node=node,
-            metrics={},
-            metadata={"manifest_path": str(manifest_path)}
+            metrics={"video_path": output_video},
+            metadata={}
         )
