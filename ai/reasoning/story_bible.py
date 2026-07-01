@@ -21,6 +21,10 @@ class StoryBibleGeneratorStage:
         }
         
         raw_text = context.project_manifest.source_text
+        # Safety limit for Milestone 1: Truncate massive novels to prevent OOM during generation
+        if len(raw_text) > 10000:
+            raw_text = raw_text[:10000] + "\n...[TRUNCATED]"
+            
         prompt = f"Extract structured character data from this story:\n{raw_text}"
         
         result_dict = self.llm.generate_json(prompt, schema)
