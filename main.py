@@ -41,7 +41,7 @@ def main():
         diff = DiffusionProvider(DiffusionConfig(cpu_offload=True))
         rend = FFmpegVideoRenderer()
         stages = [StoryBibleGeneratorStage(llm), PromptBuilderStage(), ImageGenerationStage(diff, cache), RenderingStage(rend)]
-        router = ContractRouter()
+        router = ContractRouter({})
         from core.pipeline.reducer import ContextReducer
         from core.pipeline.stage import StageResult
         reducer = ContextReducer()
@@ -95,7 +95,7 @@ def main():
     else:
         active_stages = [stages_map[args.stage]]
 
-    router = ContractRouter()
+    router = ContractRouter({})
     executor = SequentialExecutor(stages=active_stages, contract_router=router, max_retries=2)
 
     try:
