@@ -1,10 +1,10 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from uuid import UUID
 from pydantic import BaseModel, Field
 
 from core.domain.project import ProjectManifest
 from core.domain.bible import StoryBible
-from core.domain.asset import Asset
+from core.domain.asset import ExecutionNode
 from core.domain.prompt import DeclarativePrompt
 from core.domain.story import Chapter, Scene
 
@@ -14,7 +14,7 @@ class PipelineContext(BaseModel):
     Stages receive this read-only context. It is never mutated.
     Instead, a ContextReducer generates a new instance.
     """
-    model_config = {"frozen": True, "arbitrary_types_allowed": True}
+    model_config = {"frozen": True}
     
     project_manifest: ProjectManifest
     story_bible: Optional[StoryBible] = None
@@ -24,7 +24,7 @@ class PipelineContext(BaseModel):
     current_scene: Optional[Scene] = None
     
     # Tracked entities generated during execution
-    assets: Dict[UUID, Asset] = Field(default_factory=dict)
+    execution_nodes: List[ExecutionNode] = Field(default_factory=list)
     prompts: Dict[UUID, DeclarativePrompt] = Field(default_factory=dict)
     
     # Ephemeral state for inter-stage communication of non-domain data

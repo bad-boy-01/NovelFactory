@@ -79,14 +79,4 @@ class ExecutionNode:
     timestamp: str = field(default_factory=lambda: datetime.datetime.utcnow().isoformat())
 
 
-class Asset:
-    """Base asset tracking class for the context."""
-    def __init__(self, asset_id: str):
-        self.asset_id = asset_id
-        self.generated_image: Optional[GeneratedImage] = None
-        
-    def apply(self, context: Any) -> None:
-        """Commits this asset to the pipeline context."""
-        if not hasattr(context, 'assets'):
-            context.assets = []
-        context.assets.append(self)
+
