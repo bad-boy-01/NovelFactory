@@ -58,9 +58,9 @@ class SequentialExecutor:
                     break  # PASS
                 except Exception as e:
                     retries += 1
-                    logger.warning(f"[RETRY] {stage_name}: Failed ({retries}/{self.max_retries}) - {str(e)}")
+                    logger.warning(f"[RETRY] {stage_name}: Failed ({retries}/{self.max_retries}) - {str(e)}", exc_info=True)
                     if retries >= self.max_retries:
-                        logger.error(f"[FATAL] {stage_name} exhausted all retries.")
+                        logger.error(f"[FATAL] {stage_name} exhausted all retries.", exc_info=True)
                         raise e
 
             # Lifecycle: UNLOAD
