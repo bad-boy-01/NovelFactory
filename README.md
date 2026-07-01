@@ -77,17 +77,27 @@ pip install -r requirements.txt
 
 ### Running the CLI (Mock vs Real Mode)
 
-To run the pipeline and test the orchestration flow, failure taxonomy, and traceability without requiring a GPU, use **Mock Mode**. The system will simulate image generation, LLM reasoning, and inject occasional evaluation failures to test the retry loops.
+The CLI supports two execution modes via the `--mode` flag:
+
+#### 1. Mock Mode (`--mode mock`)
+This mode allows you to test the orchestration flow, failure taxonomy, and traceability **without requiring a GPU or API keys**.
 
 ```bash
 python main.py --project-name MyProject --script-file my_script.txt --mode mock
 ```
 
-**What happens:**
-1. The CLI creates an isolated `./workspace/` structure.
-2. Ingests and normalizes your script into `./workspace/datasets/MyProject/novel.txt`.
-3. Runs the full compiler pipeline.
-4. Outputs a final telemetry summary outlining generated assets and simulated drift/evaluation failures.
+**What happens in Mock Mode?**
+* The system bypasses heavy AI computation and uses hardcoded mock plugins.
+* It simulates Image Generation by creating dummy, empty `.png` files.
+* It simulates Video Rendering by creating a fake `chapter_output.mp4`.
+* It simulates LLM reasoning by injecting hardcoded character data and occasional "hallucinations".
+* It deliberately injects occasional evaluation failures (e.g., simulated "Identity Drift" or CUDA OOM errors) to test the pipeline's retry and telemetry logic.
+* You get a complete execution trace in your console verifying that the architecture flows correctly from text ingestion to video stitching.
+
+#### 2. Real Mode (`--mode real`)
+This mode is meant for **actual video production**.
+
+**Important:** Running with `--mode real` out-of-the-box will fail because NovelFactory is an architectural framework. To use real mode, you must first implement the concrete plugin classes in `plugins/interfaces.py` (e.g., writing a `HuggingFaceImageGenerator` that actually connects to Stable Diffusion via the `diffusers` library, or an `OpenAILLMProvider` that calls GPT-4). Once implemented, this mode will execute the heavy ML workloads on your GPU and generate real visual media.
 
 ### Extending with Plugins
 
