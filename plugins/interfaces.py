@@ -6,12 +6,8 @@ from core.pipeline.context import PipelineContext
 from core.domain.asset import Asset, EvaluationResult
 
 class LLMProvider(Protocol):
-    def generate_json(self, prompt: str, system_prompt: str = "") -> Dict[str, Any]:
-        """Generates a structured JSON response from the LLM."""
-        ...
-        
-    def generate_text(self, prompt: str, system_prompt: str = "") -> str:
-        """Generates plain text response from the LLM."""
+    def generate_json(self, prompt: str, schema: Dict[str, Any]) -> Dict[str, Any]:
+        """Generates a structured JSON response from the LLM, guaranteed to match schema."""
         ...
 
 class ImageGeneratorProvider(Protocol):
