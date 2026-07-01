@@ -2,23 +2,8 @@ import torch
 import importlib.metadata
 import datetime
 from pathlib import Path
+from PIL import Image
 from diffusers import StableDiffusionPipeline
-from plugins.interfaces import ImageGeneratorProvider, DiffusionConfig
-from core.domain.assets.execution import GeneratedImage, ProvenanceRecord
-
-
-class DiffusionProvider(ImageGeneratorProvider):
-    def __init__(self, config: DiffusionConfig):
-        self.config = config
-        self.pipeline = None
-        
-    def get_model_name(self) -> str:
-        return self.config.model_id
-        
-    def get_model_revision(self) -> str:
-        return self.config.revision
-
-    def initialize(self):
         print(f"[DIFFUSION] Initializing pipeline config for {self.config.model_id}...")
 
     def load(self):
