@@ -3,7 +3,6 @@ from pathlib import Path
 
 # Need to import for EvaluatorPlugin
 from core.pipeline.context import PipelineContext
-from core.domain.asset import Asset, EvaluationResult
 
 class LLMProvider(Protocol):
     def initialize(self) -> None:
@@ -49,13 +48,6 @@ class ImageGeneratorProvider(Protocol):
         
     def generate_image(self, request: 'GenerationRequest') -> 'GeneratedImage':
         """Generates an image based on the generation request and returns a rich GeneratedImage artifact."""
-        ...
-
-class EvaluatorPlugin(Protocol):
-    def get_name(self) -> str:
-        ...
-        
-    def evaluate(self, asset: Asset, context: PipelineContext) -> EvaluationResult:
         ...
 
 class VideoRendererProvider(Protocol):
