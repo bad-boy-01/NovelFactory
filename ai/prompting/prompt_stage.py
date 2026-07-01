@@ -15,7 +15,7 @@ class PromptBuilderStage:
         if not bible or not bible.characters:
             raise ValueError("StoryBible missing or has no characters.")
             
-        char = bible.characters[0]
+        char = list(bible.characters.values())[0]
         
         ast = PromptAST(
             character=char.name,
