@@ -1,9 +1,11 @@
 from core.pipeline.stage import PipelineStage, StageResult
 from core.domain.assets.execution import ExecutionNode
-from core.domain.timeline.models import Timeline, TimelineItem
-from core.domain.scene.manifest import ShotManifest
-import json
+from core.domain.prompt.ast import PromptManifest
+from core.domain.scene.manifest import SceneManifest
+from core.rendering.audio_stage import AudioManifest
+from core.domain.timeline.models import Timeline, TimelineTrack, TimelineClip, Animation
 import logging
+import hashlib
 import os
 
 logger = logging.getLogger(__name__)
@@ -15,74 +17,95 @@ class TimelineBuilderStage(PipelineStage):
 
     def get_providers(self) -> list:
         return []
-        
+
     def execute(self, context) -> StageResult:
-        shot_manifest = None
+        prompt_manifest = None
+        scene_manifest = None
+        audio_manifest = None
+        
         for node in context.execution_nodes.values():
-            if isinstance(node.artifact, ShotManifest):
-                shot_manifest = node.artifact
-                break
+            if isinstance(node.artifact, PromptManifest):
+                prompt_manifest = node.artifact
+            elif isinstance(node.artifact, SceneManifest):
+                scene_manifest = node.artifact
+            elif isinstance(node.artifact, AudioManifest):
+                audio_manifest = node.artifact
                 
-        if not shot_manifest:
-            raise ValueError("TimelineBuilder: Missing ShotManifest.")
+        if not prompt_manifest or not scene_manifest:
+            raise ValueError("TimelineBuilder: Missing PromptManifest or SceneManifest.")
             
-        items = []
+        video_track = TimelineTrack(track_id="video_main", type="video", z_index=0)
+        subtitle_track = TimelineTrack(track_id="subtitles", type="subtitle", z_index=10)
+        voice_track = TimelineTrack(track_id="voice", type="voice")
+        
         current_time = 0.0
         
-        # Build SRT content simultaneously
-        srt_lines = []
-        srt_index = 1
-        
-        for shot in shot_manifest.shots:
-            start = current_time
-            end = current_time + shot.duration
+        for p in prompt_manifest.prompts:
+            # Look up audio duration if AudioManifest exists
+            duration = 4.0 # default fallback
+            beat_id = p.shot_id.replace("shot_", "beat_") # naive mapping for scaffolding
             
-            item = TimelineItem(
-                start=start,
-                end=end,
-                layer=1,
-                asset_id=f"asset_{shot.shot_id}",  # To be fulfilled by RenderQueue
-                transition="crossfade"
-            )
-            items.append(item)
+            audio_text = "Subtitle fallback"
             
-            # Subtitle formatting
-            def format_time(seconds: float) -> str:
-                hours = int(seconds // 3600)
-                minutes = int((seconds % 3600) // 60)
-                secs = int(seconds % 60)
-                msecs = int((seconds * 1000) % 1000)
-                return f"{hours:02d}:{minutes:02d}:{secs:02d},{msecs:03d}"
+            if audio_manifest and beat_id in audio_manifest.voiceovers:
+                asset = audio_manifest.voiceovers[beat_id]
+                duration = asset.duration
+                audio_text = asset.text
                 
-            srt_lines.append(str(srt_index))
-            srt_lines.append(f"{format_time(start)} --> {format_time(end)}")
-            srt_lines.append(f"Shot: {shot.shot_id} [{shot.camera_type}]")
-            srt_lines.append("")
+                # Add voice clip
+                voice_clip = TimelineClip(
+                    clip_id=f"vo_{p.prompt_id}",
+                    asset_id=asset.asset_id,
+                    start_time=current_time,
+                    end_time=current_time + duration
+                )
+                voice_track.clips.append(voice_clip)
+                
+            # Add video clip
+            anim = Animation(type=p.ast.camera.movement, duration=duration)
             
-            srt_index += 1
-            current_time = end
+            video_clip = TimelineClip(
+                clip_id=f"vid_{p.prompt_id}",
+                asset_id=f"asset_{p.shot_id}",
+                start_time=current_time,
+                end_time=current_time + duration,
+                animation=anim
+            )
+            video_track.clips.append(video_clip)
             
+            # Add subtitle clip
+            sub_clip = TimelineClip(
+                clip_id=f"sub_{p.prompt_id}",
+                asset_id="",
+                start_time=current_time,
+                end_time=current_time + duration,
+                text=audio_text
+            )
+            subtitle_track.clips.append(sub_clip)
+            
+            current_time += duration
+            
+        # Deterministic checksum of timeline contents
+        checksum_input = f"{len(video_track.clips)}_{current_time}"
+        checksum = hashlib.md5(checksum_input.encode('utf-8')).hexdigest()
+        
         timeline = Timeline(
-            duration=current_time,
-            items=items,
-            schema_version="1.0"
+            checksum=checksum,
+            generated_from_prompt_manifest_hash=getattr(prompt_manifest, "source_hash", ""),
+            generated_from_scene_manifest_hash=getattr(scene_manifest, "source_hash", ""),
+            tracks={
+                "video_main": video_track,
+                "subtitles": subtitle_track,
+                "voice": voice_track
+            },
+            generator="TimelineBuilderStage"
         )
         
-        # Output artifacts to disk
-        timeline_path = os.path.join(self.output_dir, "Timeline.json")
-        srt_path = os.path.join(self.output_dir, "subtitles.srt")
-        
-        with open(timeline_path, "w", encoding="utf-8") as f:
-            f.write(timeline.model_dump_json(indent=2))
-            
-        with open(srt_path, "w", encoding="utf-8") as f:
-            f.write("\n".join(srt_lines))
-            
         node = ExecutionNode(artifact=timeline, stage_name="TimelineBuilderStage")
         
         return StageResult(
             artifact=timeline,
             execution_node=node,
-            metrics={"duration": timeline.duration, "items": len(items)},
-            metadata={"files_generated": [timeline_path, srt_path]}
+            metrics={"duration": current_time, "video_clips": len(video_track.clips)},
+            metadata={}
         )
