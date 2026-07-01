@@ -39,39 +39,24 @@ The core framework requires `pydantic`. You will also need to install the depend
 !pip install diffusers transformers torch accelerate
 ```
 
-**3. Example Execution Framework:**
-NovelFactory is an orchestration framework. To run it, you must implement the plugin interfaces and wire up the executor. Here is a boilerplate cell to get you started:
-
+**3. Install specific framework dependencies:**
 ```python
-from pathlib import Path
-from core.pipeline.executor import SequentialExecutor
-from core.pipeline.context import PipelineContext
-from core.domain.project import ProjectManifest
-
-# 1. Initialize your context
-project_manifest = ProjectManifest(project_name="MyNovel", dataset_id="dataset_01")
-context = PipelineContext(project_manifest=project_manifest)
-
-# 2. Define your plugins (You must implement these interfaces in Kaggle)
-# from plugins.interfaces import ImageGeneratorProvider, LLMProvider
-# class MyHuggingFaceGenerator(ImageGeneratorProvider): 
-#     ...
-# class MyLLMProvider(LLMProvider): 
-#     ...
-
-# 3. Instantiate Stages
-# from ai.reasoning.story_bible import StoryBibleGeneratorStage
-# from ai.prompting.compiler import PromptCompilerStage
-# from ai.generation.image import ImageGenerationStage
-
-# stages = [
-#     StoryBibleGeneratorStage(llm=MyLLMProvider()),
-#     PromptCompilerStage(prompt_pack=my_pack),
-#     ImageGenerationStage(provider=MyHuggingFaceGenerator(), output_dir=Path("./output"))
-# ]
-
-# 4. Run Pipeline
-# executor = SequentialExecutor(stages=stages)
-# final_context = executor.run(context)
-# print("Pipeline execution complete!")
+!pip install -r requirements.txt
 ```
+
+**4. Run the Pipeline CLI:**
+NovelFactory now includes a full end-to-end execution harness via `main.py`. It supports reading directly from `.txt` and `.docx` script files.
+
+To run the pipeline in **mock mode** (which simulates image generation, LLM reasoning, and evaluation to verify orchestration flow without requiring GPUs or API keys):
+
+```bash
+!python main.py --project-name MyProject --script-file my_script.txt --mode mock
+```
+
+*(Note: `--mode real` is currently a placeholder for when you inject your own concrete plugin implementations for Image Generators and LLMs.)*
+
+The CLI will automatically:
+- Create a `workspace/` directory structure.
+- Ingest your script into `workspace/datasets/MyProject/novel.txt`.
+- Execute the Story Bible generator, Prompt Compiler, Image Generator, and Video Renderer.
+- Output a traced summary of the assets generated and any simulated drift/evaluation failures.
