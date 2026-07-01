@@ -29,8 +29,27 @@ def save_workspace(name: str, content: str):
 def main():
     parser = argparse.ArgumentParser(description="NovelFactory Milestone 1 Validator")
     parser.add_argument("--novel", type=str, default="sample.txt", help="Path to novel text")
-    parser.add_argument("--stage", type=str, default="all", help="Stage to run: story_bible, prompt, diffusion, render, all")
+    parser.add_argument("--stage", type=str, default="all", help="Stage to run: story_bible, prompt, diffusion, render, all, validate")
     args = parser.parse_args()
+
+    if args.stage == "validate":
+        logger.info("[VALIDATE] Running architectural sanity check...")
+        manifest = ProjectManifest(title="Sanity", author="Test", source_text="test")
+        context = PipelineContext(project_manifest=manifest)
+        llm = LocalLLMProvider()
+        cache = CacheProvider(".cache")
+        diff = DiffusionProvider(DiffusionConfig(cpu_offload=True))
+        rend = FFmpegVideoRenderer()
+        stages = [StoryBibleGeneratorStage(llm), PromptBuilderStage(), ImageGenerationStage(diff, cache), RenderingStage(rend)]
+        router = ContractRouter()
+        from core.pipeline.reducer import ContextReducer
+        from core.pipeline.stage import StageResult
+        reducer = ContextReducer()
+        dummy_result = StageResult(artifact="dummy", metrics={}, metadata={})
+        new_ctx = reducer.reduce(context, dummy_result)
+        assert new_ctx is not context, "Reducer mutated context instead of copying!"
+        logger.info("[SUCCESS] Sanity validation passed. All architecture components wired correctly.")
+        return
 
     Path("workspace").mkdir(exist_ok=True)
     Path("debug").mkdir(exist_ok=True)
