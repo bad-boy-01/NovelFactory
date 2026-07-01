@@ -1,0 +1,3 @@
+pydantic
+python-docx
+typing-extensions
