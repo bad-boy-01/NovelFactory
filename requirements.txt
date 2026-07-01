@@ -1,3 +1,11 @@
-pydantic
+torch
+transformers>=4.40
+accelerate
+bitsandbytes>=0.46.1
+diffusers
+safetensors
+sentencepiece
+huggingface_hub
 python-docx
+pydantic
 typing-extensions

@@ -26,18 +26,33 @@ class LocalLLMProvider(LLMProvider):
         if not self.tokenizer:
             self.initialize()
             
-        from transformers import BitsAndBytesConfig
-        bnb_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_compute_dtype=torch.float16,
-            bnb_4bit_use_double_quant=True
-        )
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_id,
-            quantization_config=bnb_config,
-            device_map="auto",
-            trust_remote_code=True
-        )
+        try:
+            import bitsandbytes
+            from transformers import BitsAndBytesConfig
+            bnb_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_use_double_quant=True
+            )
+            print("[LLM] Using bitsandbytes 4-bit quantization.")
+        except Exception as e:
+            bnb_config = None
+            print(f"[LLM] WARNING: bitsandbytes unavailable ({e}). Falling back to fp16.")
+
+        if bnb_config:
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.model_id,
+                quantization_config=bnb_config,
+                device_map="auto",
+                trust_remote_code=True
+            )
+        else:
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.model_id,
+                torch_dtype=torch.float16,
+                device_map="auto",
+                trust_remote_code=True
+            )
 
     def unload(self):
         from core.utils.vram import flush_vram
