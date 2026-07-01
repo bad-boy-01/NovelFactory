@@ -45,7 +45,8 @@ def main():
         from core.pipeline.reducer import ContextReducer
         from core.pipeline.stage import StageResult
         reducer = ContextReducer()
-        dummy_result = StageResult(artifact="dummy", metrics={}, metadata={})
+        from core.domain.asset import ExecutionNode
+        dummy_result = StageResult(artifact="dummy", execution_node=ExecutionNode(artifact="dummy", stage_name="validate"), metrics={}, metadata={})
         new_ctx = reducer.reduce(context, dummy_result)
         assert new_ctx is not context, "Reducer mutated context instead of copying!"
         logger.info("[SUCCESS] Sanity validation passed. All architecture components wired correctly.")
