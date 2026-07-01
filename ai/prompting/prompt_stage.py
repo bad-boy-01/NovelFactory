@@ -1,37 +1,70 @@
-from core.pipeline.stage import StageResult
+from core.pipeline.stage import PipelineStage, StageResult
 from core.domain.asset import ExecutionNode
-from core.prompt.ast import PromptAST
+from core.domain.prompt import PromptManifest, PromptManifestEntry, PromptAST, CameraAST
+from core.domain.scene import ShotManifest
+from core.domain.bible import StoryBible
+import hashlib
 
-class PromptBuilderStage:
-    def __init__(self):
-        pass
-        
+class PromptBuilderStage(PipelineStage):
     def get_providers(self) -> list:
         return []
 
     def execute(self, context) -> StageResult:
-        bible = context.story_bible
+        shot_manifest = None
+        bible = None
         
-        if not bible or not bible.characters:
-            raise ValueError("StoryBible missing or has no characters.")
+        for node in context.execution_nodes.values():
+            if isinstance(node.artifact, ShotManifest):
+                shot_manifest = node.artifact
+            elif isinstance(node.artifact, StoryBible):
+                bible = node.artifact
+                
+        if not shot_manifest:
+            raise ValueError("No ShotManifest found in context.")
             
-        char = list(bible.characters.values())[0]
-        
-        ast = PromptAST(
-            character=char.name,
-            outfit=char.outfit,
-            scene="dark forest illuminated by moonlight",
-            camera="medium shot, centered",
-            lighting="soft cinematic lighting",
-            style="anime cinematic, high detail",
-            negative="low quality, blurry, distorted"
+        prompts = []
+        for shot in shot_manifest.shots:
+            # Deterministic seed based on hash
+            seed_hash = hashlib.md5(shot.shot_id.encode('utf-8')).hexdigest()
+            seed = int(seed_hash, 16) % (2**32 - 1)
+            
+            ast = PromptAST(
+                subject="Korean Manhwa scene",
+                characters=[],
+                environment="Determined by scene",
+                camera=CameraAST(
+                    type=shot.camera_type,
+                    lens=shot.lens,
+                    angle=shot.angle,
+                    distance=shot.distance,
+                    movement=shot.movement
+                ),
+                lighting="soft cinematic lighting",
+                composition="rule of thirds",
+                style="anime cinematic, high detail",
+                negative="low quality, blurry, distorted"
+            )
+            
+            entry = PromptManifestEntry(
+                prompt_id=f"prompt_{seed_hash[:8]}",
+                scene_id="unknown", # normally we'd pass scene_id down via Shot object
+                shot_id=shot.shot_id,
+                ast=ast,
+                seed=seed
+            )
+            prompts.append(entry)
+            
+        manifest = PromptManifest(
+            prompts=prompts,
+            generator="PromptBuilderStage",
+            generator_version="0.2.0"
         )
         
-        node = ExecutionNode(artifact=ast, stage_name="PromptBuilderStage")
+        node = ExecutionNode(artifact=manifest, stage_name="PromptBuilderStage")
         
         return StageResult(
-            artifact=ast,
+            artifact=manifest,
             execution_node=node,
-            metrics={},
+            metrics={"prompts_generated": len(prompts)},
             metadata={}
         )
