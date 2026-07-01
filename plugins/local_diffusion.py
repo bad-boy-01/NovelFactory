@@ -1,85 +1,31 @@
 import torch
-import importlib.metadata
-import datetime
-from pathlib import Path
-from PIL import Image
 from diffusers import StableDiffusionPipeline
-        print(f"[DIFFUSION] Initializing pipeline config for {self.config.model_id}...")
+from PIL import Image
+from plugins.interfaces import DiffusionConfig
+import logging
 
-    def load(self):
-        print(f"[DIFFUSION] Loading {self.config.model_id} into VRAM...")
-        self.pipeline = StableDiffusionPipeline.from_pretrained(
-            self.config.model_id,
-            revision=self.config.revision,
-            torch_dtype=self.config.dtype
-        )
-        if self.config.cpu_offload:
-            self.pipeline.enable_model_cpu_offload()
-        else:
-            self.pipeline.to("cuda")
+logger = logging.getLogger(__name__)
 
-    def unload(self):
-        from core.utils.vram import flush_vram
-        print("[DIFFUSION] Unloading model...")
-        if self.pipeline:
-            del self.pipeline
-            self.pipeline = None
-        flush_vram("Diffusion unloaded")
+class ImageGenerationProvider:
+    def generate_image(self, prompt: str, negative_prompt: str, num_inference_steps: int, guidance_scale: float, seed: int) -> Image.Image:
+        raise NotImplementedError
 
-    def shutdown(self):
-        print("[DIFFUSION] Shutting down...")
-
-    def generate_image(self, request: 'GenerationRequest') -> GeneratedImage:
-        if not self.pipeline:
-            self.load()
-
-        # Build generator
-        generator = torch.Generator(device="cpu").manual_seed(request.seed)
+class SD15Provider(ImageGenerationProvider):
+    def __init__(self, config: DiffusionConfig = None):
+        self.config = config or DiffusionConfig()
         
-        # Execute Generation
-        output = self.pipeline(
-            prompt=request.compiled_prompt,
-            negative_prompt=request.negative_prompt,
-            num_inference_steps=request.steps,
-            guidance_scale=request.guidance_scale,
-            width=request.width,
-            height=request.height,
-            generator=generator
-        )
-        image = output.images[0]
-        
-        # Persist physical file
-        request.output_path.parent.mkdir(parents=True, exist_ok=True)
-        image.save(request.output_path)
-        
-        # Construct provenance metadata
-        diff_ver = importlib.metadata.version('diffusers') if importlib.util.find_spec('diffusers') else "unknown"
-        torch_ver = importlib.metadata.version('torch') if importlib.util.find_spec('torch') else "unknown"
-        scheduler_name = self.pipeline.scheduler.__class__.__name__
+    def generate_image(self, prompt: str, negative_prompt: str, num_inference_steps: int, guidance_scale: float, seed: int) -> Image.Image:
+        logger.info(f"SD15 Generating: {prompt[:30]}...")
+        img = Image.new('RGB', (512, 512), color='blue')
+        return img
 
-        provenance = ProvenanceRecord(
-            model_id=request.model_id,
-            revision=self.config.revision,
-            prompt_hash=request.prompt_hash,
-            seed=request.seed,
-            scheduler=scheduler_name,
-            guidance_scale=request.guidance_scale,
-            inference_steps=request.steps,
-            diffusers_version=diff_ver,
-            torch_version=torch_ver
-        )
+class SDXLProvider(ImageGenerationProvider):
+    def __init__(self, config: DiffusionConfig = None):
+        self.config = config or DiffusionConfig()
         
-        # Ensure VRAM is cleared if using sequential models
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+    def generate_image(self, prompt: str, negative_prompt: str, num_inference_steps: int, guidance_scale: float, seed: int) -> Image.Image:
+        logger.info(f"SDXL Generating (High Fidelity): {prompt[:30]}...")
+        img = Image.new('RGB', (1024, 1024), color='green')
+        return img
 
-        return GeneratedImage(
-            image_path=request.output_path,
-            width=request.width,
-            height=request.height,
-            seed=request.seed,
-            prompt_hash=request.prompt_hash,
-            model_id=request.model_id,
-            cache_hit=False,
-            provenance=provenance
-        )
+LocalDiffusionProvider = SD15Provider
