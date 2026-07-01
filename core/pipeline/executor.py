@@ -59,7 +59,7 @@ class SequentialExecutor:
                 except Exception as e:
                     retries += 1
                     logger.warning(f"[RETRY] {stage_name}: Failed ({retries}/{self.max_retries}) - {str(e)}")
-                    if retries > self.max_retries:
+                    if retries >= self.max_retries:
                         logger.error(f"[FATAL] {stage_name} exhausted all retries.")
                         raise e
 

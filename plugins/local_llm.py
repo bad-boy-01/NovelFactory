@@ -91,11 +91,18 @@ TASK:
 OUTPUT:
 """
 
-        inputs = self.tokenizer(full_prompt, return_tensors="pt").to(self.model.device)
+        inputs = self.tokenizer(
+            full_prompt, 
+            return_tensors="pt",
+            truncation=True,
+            max_length=2048
+        ).to(self.model.device)
+        
+        print(f"[LLM] Prompt tokenized to {inputs.input_ids.shape[1]} tokens (max 2048).")
 
         output = self.model.generate(
             **inputs,
-            max_new_tokens=800,
+            max_new_tokens=512,
             temperature=0.3,
             top_p=0.9
         )
