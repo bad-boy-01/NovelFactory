@@ -1,5 +1,5 @@
 from pathlib import Path
-from core.domain.story.project import ProjectManifest
+from core.domain.story.project import ProjectManifest, ProjectMetadata
 
 class ProjectBuilder:
     def __init__(self, projects_dir: Path, datasets_dir: Path):
@@ -29,7 +29,7 @@ class ProjectBuilder:
             (project_path / folder).mkdir(parents=True, exist_ok=True)
 
     def _generate_manifest(self, project_name: str, dataset_name: str, project_path: Path) -> ProjectManifest:
-        manifest = ProjectManifest(project_name=project_name, dataset_id=dataset_name)
+        manifest = ProjectManifest(metadata=ProjectMetadata(project_name=project_name, dataset_id=dataset_name))
         with open(project_path / "project.json", "w") as f:
             f.write(manifest.model_dump_json(indent=4))
         return manifest
