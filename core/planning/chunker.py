@@ -34,7 +34,7 @@ class ChunkerStage(PipelineStage):
         while start < text_len:
             end = min(start + self.chunk_size, text_len)
             
-            # Snap to paragraph boundary
+            # Snap to paragraph boundary (only when not already at the end)
             if end < text_len:
                 next_para = source_text.find('\n\n', end - 500, end + 500)
                 if next_para != -1:
@@ -50,12 +50,17 @@ class ChunkerStage(PipelineStage):
                 end_char=end,
                 chapter=chapter
             ))
-            
-            start = end - self.overlap
-            
+
             # Simple chapter increment mock
             if "Chapter" in chunk_text:
                 chapter += 1
+
+            # If we've consumed to the end, stop — otherwise the overlap
+            # would set start < text_len again causing an infinite loop.
+            if end >= text_len:
+                break
+
+            start = end - self.overlap
             
         manifest = ChunkerManifest(chunks=chunks, generator="ChunkerStage", generator_version="1.0")
         node = ExecutionNode(artifact=manifest, stage_name="ChunkerStage")
