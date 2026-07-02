@@ -13,7 +13,7 @@ from plugins.interfaces import DiffusionConfig
 from core.pipeline.cache import CacheProvider
 from core.optimization.prompt_builder import PromptBuilderStage
 from plugins.ffmpeg_renderer import FFmpegVideoRenderer
-from core.rendering.assembly_stage import RenderingStage
+from core.rendering.assembly_stage import FFmpegAssemblyStage
 from core.rendering.executor import SequentialExecutor
 from core.contracts.router import ContractRouter
 
@@ -44,7 +44,7 @@ def main():
         diff = LocalDiffusionProvider(DiffusionConfig(cpu_offload=True))
         rend = FFmpegVideoRenderer()
         from core.rendering.image_stage import DiffusionRendererStage
-        stages = [StoryBibleGeneratorStage(llm), PromptBuilderStage(), DiffusionRendererStage(diffusion_provider=diff), RenderingStage(rend)]
+        stages = [StoryBibleGeneratorStage(llm), PromptBuilderStage(), DiffusionRendererStage(diffusion_provider=diff), FFmpegAssemblyStage()]
         router = ContractRouter({})
         from core.pipeline.reducer import ContextReducer
         from core.pipeline.stage import StageResult
