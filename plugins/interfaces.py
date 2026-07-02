@@ -61,6 +61,10 @@ class PromptFingerprint(BaseModel):
         return hashlib.sha256(self.model_dump_json().encode()).hexdigest()
 
 class ImageGenerationProvider(Protocol):
+    def compile_prompt(self, visual_scene: 'VisualScene') -> 'RenderJob':
+        """Compiles a fully resolved VisualScene into a provider-specific RenderJob."""
+        ...
+        
     def capabilities(self) -> ProviderCapability:
         ...
         

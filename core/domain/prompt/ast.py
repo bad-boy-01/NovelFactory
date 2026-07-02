@@ -7,10 +7,15 @@ class SubjectAST(BaseModel):
 
 class CharacterAST(BaseModel):
     name: str = ""
-    visual_dna: str = ""
-    clothing: str = ""
+    appearance_tags: List[str] = []
+    clothing_tags: List[str] = []
+    signature_tags: List[str] = []
     action: str = ""
     emotion: str = ""
+    pose: str = ""
+    visibility: str = ""
+    interaction: str = ""
+    bindings: dict = {}
 
 class EnvironmentAST(BaseModel):
     location: str = ""
@@ -58,11 +63,14 @@ class PromptAST(BaseModel):
     technical: TechnicalAST = TechnicalAST()
     negative: NegativeAST = NegativeAST()
 
+from core.domain.prompt.visual_scene import VisualScene
+
 class PromptManifestEntry(BaseModel):
     prompt_id: str
     scene_id: str
     shot_id: str
     ast: PromptAST
+    visual_scene: Optional[VisualScene] = None
     seed: int
     model_target: str = "sdxl"
     

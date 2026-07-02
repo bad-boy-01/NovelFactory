@@ -104,30 +104,11 @@ class DiffusionRendererStage(PipelineStage):
             try:
                 logger.info(f"Rendering job {job_id} (Seed {target_prompt.seed})")
                 
-                ast = target_prompt.ast
+                visual_scene = target_prompt.visual_scene
                 
-                # Extract and combine tags
-                style_tags = ", ".join(ast.quality.tags) if ast.quality.tags else ""
-                negative_str = ", ".join(ast.negative.tags) if ast.negative.tags else ""
-                
-                prompt_str = f"{ast.subject.description}, {ast.environment.location}, {ast.camera.distance} {ast.camera.angle}, {ast.lighting.style}, {ast.composition.style}, {style_tags}"
-                
-                from core.domain.rendering.presets import RenderJob, RenderPreset
-                preset = RenderPreset(
-                    width=1024,
-                    height=1024,
-                    steps=ast.technical.steps,
-                    cfg=0.0, # ByteDance Lightning recommends 0 CFG
-                    sampler="euler",
-                    negative_prompt=negative_str
-                )
-                
-                render_job = RenderJob(
-                    prompt=prompt_str,
-                    negative_prompt=negative_str,
-                    seed=target_prompt.seed,
-                    preset=preset
-                )
+                # Provider-specific AST compilation
+                render_job = self.diffusion.compile_prompt(visual_scene)
+                render_job.seed = target_prompt.seed
                 
                 # Render using the provider
                 import time

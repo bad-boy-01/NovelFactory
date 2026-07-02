@@ -58,7 +58,10 @@ You are a master cinematic story planner. Split the following text chunk into di
 CRITICAL RULES:
 - Never summarize. Expand the story to capture every detail.
 - Preserve every event, dialogue, and emotional beat.
+- Break each scene down into an explicit sequence of `beats`. A beat is a distinct narrative moment (e.g. 'Character enters room', 'Discovers the letter', 'Reacts with shock').
+- There should be between 3 and 10 beats per scene, representing the continuous flow of action and emotion.
 - Provide approximate start_char and end_char offsets for the scene relative to the novel.
+
 Text (Chapter {chunk.chapter}):
 {chunk.text}
 """

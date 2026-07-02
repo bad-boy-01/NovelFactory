@@ -15,6 +15,15 @@ class MockProvider(ImageGenerationProvider):
     def load(self) -> None:
         pass
         
+    def compile_prompt(self, visual_scene: 'VisualScene') -> RenderJob:
+        from core.domain.rendering.presets import RenderPreset
+        return RenderJob(
+            prompt="Mock Image",
+            negative_prompt="",
+            seed=0,
+            preset=RenderPreset()
+        )
+        
     def generate(self, job: RenderJob, callback=None) -> Image.Image:
         logger.info(f"Mock Generating: {job.prompt[:30]}...")
         if callback:
@@ -34,6 +43,57 @@ class DiffusersProvider(ImageGenerationProvider):
         self.config = config
         self.pipeline = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        
+    def compile_prompt(self, visual_scene: 'VisualScene') -> RenderJob:
+        from core.domain.rendering.presets import RenderJob, RenderPreset
+        
+        # Build SDXL Prompt using ordered sections with weights
+        sections = []
+        
+        # 1. Subject (Highest Weight)
+        sections.append(f"({visual_scene.subject}:1.2)")
+        
+        # 2. Characters
+        char_desc = []
+        for c in visual_scene.characters:
+            char_str = f"{c.name}, {c.appearance}, {c.wardrobe}, {c.pose}, {c.emotion}"
+            char_desc.append(f"({char_str}:1.1)")
+        if char_desc:
+            sections.append(" ".join(char_desc))
+            
+        # 3. Environment
+        env = visual_scene.environment
+        env_str = f"{env.location_desc}, {env.time}, {env.weather}, {env.lighting}, {env.palette}, {env.environment_state}"
+        sections.append(f"({env_str}:1.0)")
+        
+        # 4. Camera & Lighting & Composition
+        cam = visual_scene.camera
+        style = visual_scene.style
+        cam_str = f"{cam.distance} {cam.angle} shot, {cam.lens}"
+        sections.append(f"({cam_str}, {style.composition}, {style.lighting_style}, {style.color_grade}:0.9)")
+        
+        # 5. Quality
+        quality_str = ", ".join(style.quality_tags)
+        sections.append(f"({quality_str}:0.8)")
+        
+        prompt_str = " ".join(sections)
+        negative_str = ", ".join(style.negative_tags)
+        
+        preset = RenderPreset(
+            width=visual_scene.width,
+            height=visual_scene.height,
+            steps=visual_scene.steps,
+            cfg=visual_scene.cfg if not (self.config.adapter and "Lightning" in self.config.adapter) else 0.0,
+            sampler=visual_scene.sampler,
+            negative_prompt=negative_str
+        )
+        
+        return RenderJob(
+            prompt=prompt_str,
+            negative_prompt=negative_str,
+            seed=0, # The executor overwrites the seed
+            preset=preset
+        )
         
     def capabilities(self):
         from plugins.interfaces import ProviderCapability

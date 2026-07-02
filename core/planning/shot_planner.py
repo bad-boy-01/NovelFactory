@@ -1,28 +1,38 @@
-from core.pipeline.stage import PipelineStage, StageResult
+from core.pipeline.stage import CompilerStage, StageResult
 from core.domain.assets.execution import ExecutionNode
-from core.domain.scene.manifest import SceneManifest, ShotManifest, Shot, FrameInstruction
+from core.domain.scene.manifest import SceneManifest, ShotManifest, Shot
+from core.pipeline.context import PipelineContext
 import hashlib
 import json
 import logging
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
-class ShotPlannerStage(PipelineStage):
+class ShotPlannerStage(CompilerStage):
     def __init__(self, llm_provider=None):
         self.llm = llm_provider
 
     def get_name(self) -> str:
         return "ShotPlannerStage"
 
-    def fingerprint(self, context) -> str:
-        # Generate a fingerprint based on the class name and provider type
-        base = f"{self.get_name()}_{type(self.llm).__name__ if self.llm else 'default'}"
-        return hashlib.sha256(base.encode('utf-8')).hexdigest()
-
     def get_providers(self) -> list:
         return [self.llm] if self.llm else []
         
-    def execute(self, context) -> StageResult:
+    def inputs(self, context: PipelineContext) -> list[Any]:
+        # ShotPlanner depends on SceneManifest
+        for node in context.execution_nodes:
+            if isinstance(node.artifact, SceneManifest):
+                return [node.artifact]
+        return []
+        
+    def outputs(self) -> list[str]:
+        return ["shot_manifest"]
+        
+    def generator_signature(self) -> str:
+        return f"{self.get_name()}_{type(self.llm).__name__ if self.llm else 'default'}_v1.0"
+
+    def execute(self, context: PipelineContext) -> StageResult:
         if not self.llm:
             from plugins.local_llm import LocalLLMProvider
             self.llm = LocalLLMProvider()
@@ -36,25 +46,72 @@ class ShotPlannerStage(PipelineStage):
         if not scene_manifest:
             raise ValueError("No SceneManifest found in context.")
             
+        schema = {
+            "beats": [
+                {
+                    "beat_id": "string",
+                    "shots": [
+                        {
+                            "purpose": "string (e.g. establishing, reaction, insert, closeup)",
+                            "emotion": "string",
+                            "importance": "string (high, medium, low)",
+                            "focus": "string (environment, character, object)",
+                            "duration": 3.0
+                        }
+                    ]
+                }
+            ]
+        }
+            
         all_shots = []
         
-        for scene in scene_manifest.scenes:
-            # Generate deterministic shot_ids
+        for scene_idx, scene in enumerate(scene_manifest.scenes):
             scene_hash = hashlib.sha256(scene.scene_id.encode('utf-8')).hexdigest()[:8]
             
-            # Simulated Shot Expansion for Milestone 2 deterministic tests
-            # (In Milestone 3, this calls the LLM with the prompt AST)
-            shots = [
-                Shot(shot_id=f"shot_{scene_hash}_01", duration=4.0),
-                Shot(shot_id=f"shot_{scene_hash}_02", duration=3.5)
-            ]
-            all_shots.extend(shots)
+            prompt = f"""
+You are a master cinematographer and film editor. Expand the following narrative beats into a cinematic shot sequence (coverage).
+CRITICAL RULES:
+- Film editors think in coverage. Provide 3 to 6 shots per beat.
+- Start a scene with an Establishing shot.
+- Use distinct purposes like 'Reaction', 'Over shoulder', 'Insert object', 'Close-up'.
+- Do NOT output the physical camera parameters (like 50mm or eye-level). Output semantic intent: purpose, emotion, importance, and focus.
+
+Scene Location: {scene.location}
+Scene Emotion: {scene.emotion}
+Characters Present: {', '.join(scene.characters)}
+
+Beats:
+"""
+            for beat in scene.beats:
+                prompt += f"- [Beat {beat.beat_id}] {beat.description} (Emotion: {beat.emotion})\n"
+                
+            try:
+                result_dict = self.llm.generate_json(prompt, schema)
+            except Exception as e:
+                logger.warning(f"LLM shot coverage extraction failed for scene {scene.scene_id}, falling back.")
+                result_dict = {"beats": []}
+                
+            shot_idx = 0
+            for beat_cov in result_dict.get("beats", []):
+                for shot_data in beat_cov.get("shots", []):
+                    shot_idx += 1
+                    shot_id = f"shot_{scene_hash}_{shot_idx:03d}"
+                    
+                    shot = Shot(
+                        shot_id=shot_id,
+                        purpose=shot_data.get("purpose", "mid"),
+                        emotion=shot_data.get("emotion", "neutral"),
+                        importance=shot_data.get("importance", "medium"),
+                        focus=shot_data.get("focus", "character"),
+                        duration=shot_data.get("duration", 2.0)
+                    )
+                    all_shots.append(shot)
             
         manifest = ShotManifest(
             shots=all_shots,
             generator="ShotPlannerStage",
-            generator_version="0.1.0",
-            schema_version="1.0"
+            generator_version="1.0.0",
+            schema_version="2.0"
         )
         
         node = ExecutionNode(artifact=manifest, stage_name="ShotPlannerStage")

@@ -1,13 +1,30 @@
-from core.pipeline.stage import PipelineStage, StageResult
+from core.pipeline.stage import CompilerStage, StageResult
 from core.domain.assets.execution import ExecutionNode
 from core.domain.scene.manifest import ShotManifest
+from core.pipeline.context import PipelineContext
+from typing import Any
 import copy
 
-class CameraPlannerStage(PipelineStage):
+class CameraPlannerStage(CompilerStage):
+    def get_name(self) -> str:
+        return "CameraPlannerStage"
+
     def get_providers(self) -> list:
         return []
         
-    def execute(self, context) -> StageResult:
+    def inputs(self, context: PipelineContext) -> list[Any]:
+        for node in context.execution_nodes:
+            if isinstance(node.artifact, ShotManifest):
+                return [node.artifact]
+        return []
+        
+    def outputs(self) -> list[str]:
+        return ["shot_manifest_with_camera"]
+        
+    def generator_signature(self) -> str:
+        return f"{self.get_name()}_rule_engine_v1.0"
+        
+    def execute(self, context: PipelineContext) -> StageResult:
         shot_manifest = None
         for node in context.execution_nodes:
             if isinstance(node.artifact, ShotManifest):
@@ -17,15 +34,48 @@ class CameraPlannerStage(PipelineStage):
         if not shot_manifest:
             raise ValueError("No ShotManifest found in context.")
             
-        # Deterministically apply camera logic without LLM (Fast, cheap, stable)
         enriched_manifest = copy.deepcopy(shot_manifest)
+        enriched_manifest.generator = "CameraPlannerStage"
+        enriched_manifest.generator_version = "1.0.0"
         
-        for i, shot in enumerate(enriched_manifest.shots):
+        for shot in enriched_manifest.shots:
+            purpose = shot.purpose.lower()
+            emotion = shot.emotion.lower()
+            focus = shot.focus.lower()
+            
             shot.camera_type = "cinematic"
-            shot.lens = "50mm" if i % 2 == 0 else "85mm"
-            shot.angle = "eye-level"
-            shot.distance = "medium" if i % 2 == 0 else "close-up"
-            shot.movement = "slow pan right" if i % 2 == 0 else "static"
+            
+            # Distance / Framing
+            if "establishing" in purpose or "wide" in purpose:
+                shot.distance = "wide shot"
+                shot.lens = "24mm"
+            elif "closeup" in purpose or "close-up" in purpose or "reaction" in purpose:
+                shot.distance = "close-up"
+                shot.lens = "85mm"
+            elif "insert" in purpose:
+                shot.distance = "extreme close-up"
+                shot.lens = "100mm macro"
+            else:
+                shot.distance = "medium shot"
+                shot.lens = "50mm"
+                
+            # Angle
+            if "intimidating" in emotion or "powerful" in emotion:
+                shot.angle = "low angle"
+            elif "vulnerable" in emotion or "weak" in emotion:
+                shot.angle = "high angle"
+            else:
+                shot.angle = "eye-level"
+                
+            # Movement
+            if "action" in emotion or "chaotic" in emotion:
+                shot.movement = "handheld tracking"
+            elif "establishing" in purpose:
+                shot.movement = "slow dolly in"
+            elif "reaction" in purpose:
+                shot.movement = "static push-in"
+            else:
+                shot.movement = "static"
             
         node = ExecutionNode(artifact=enriched_manifest, stage_name="CameraPlannerStage")
         
