@@ -26,18 +26,26 @@ class FFmpegAssemblyStage(PipelineStage):
         if not timeline:
             raise ValueError("FFmpegAssembly: Missing Timeline.")
             
-        logger.info(f"Assembling video from Timeline ({len(timeline.items)} items)...")
+        # Get count of video clips
+        video_track = timeline.tracks.get("video_main")
+        clip_count = len(video_track.clips) if video_track else 0
+        logger.info(f"Assembling video from Timeline ({clip_count} items)...")
         
         # 1. Create concat file for FFmpeg
         concat_file = os.path.join(self.output_dir, "concat.txt")
-        images = sorted([f for f in os.listdir(self.output_dir) if f.endswith(".png")])
+        
+        import glob
+        # Images are saved by ImageStage in workspace/Shot_XXX/image.png
+        images = sorted(glob.glob(os.path.join(self.output_dir, "Shot_*", "image.png")))
         
         if not images:
             raise ValueError("FFmpegAssembly: No rendered assets found.")
             
         with open(concat_file, "w", encoding="utf-8") as f:
             for img in images:
-                f.write(f"file '{img}'\n")
+                # Use forward slashes for FFmpeg path compatibility
+                img_path = img.replace("\\", "/")
+                f.write(f"file '{img_path}'\n")
                 f.write(f"duration 4.0\n") # Static duration for demo
                 
         output_video = os.path.join(self.output_dir, "final_video.mp4")

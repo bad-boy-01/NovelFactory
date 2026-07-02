@@ -7,6 +7,7 @@ import logging
 import os
 import json
 import math
+import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -88,16 +89,21 @@ class DiffusionRendererStage(PipelineStage):
                 logger.info(f"Rendering job {job_id} (Seed {target_prompt.seed})")
                 
                 ast = target_prompt.ast
-                prompt_str = f"{ast.subject}, {ast.environment}, {ast.camera.distance} {ast.camera.angle}, {ast.lighting}, {ast.composition}, {ast.style}"
+                
+                # Extract and combine tags
+                style_tags = ", ".join(ast.quality.tags) if ast.quality.tags else ""
+                negative_str = ", ".join(ast.negative.tags) if ast.negative.tags else ""
+                
+                prompt_str = f"{ast.subject.description}, {ast.environment.location}, {ast.camera.distance} {ast.camera.angle}, {ast.lighting.style}, {ast.composition.style}, {style_tags}"
                 
                 # Render using the provider
                 import time
                 start_time = time.time()
                 image = self.diffusion.generate_image(
                     prompt=prompt_str,
-                    negative_prompt=ast.negative,
-                    num_inference_steps=target_prompt.steps,
-                    guidance_scale=target_prompt.cfg,
+                    negative_prompt=negative_str,
+                    num_inference_steps=ast.technical.steps,
+                    guidance_scale=ast.technical.cfg,
                     seed=target_prompt.seed
                 )
                 render_time = time.time() - start_time
@@ -115,7 +121,7 @@ class DiffusionRendererStage(PipelineStage):
                 with open(f"{shot_dir}/optimized_prompt.txt", "w", encoding="utf-8") as f:
                     f.write(prompt_str)
                 with open(f"{shot_dir}/negative.txt", "w", encoding="utf-8") as f:
-                    f.write(ast.negative or "")
+                    f.write(negative_str)
                     
                 with open(f"{shot_dir}/metadata.json", "w", encoding="utf-8") as f:
                     json.dump({
@@ -127,11 +133,10 @@ class DiffusionRendererStage(PipelineStage):
                         "variation": 0,
                         "model": "sdxl-lightning",
                         "scheduler": "lcm",
-                        "steps": target_prompt.steps,
-                        "cfg": target_prompt.cfg,
-                        "width": 1024,
-                        "height": 576,
-                        "render_time": round(render_time, 2)
+                        "steps": ast.technical.steps,
+                        "cfg": ast.technical.cfg,
+                        "render_time": round(render_time, 2),
+                        "timestamp": datetime.datetime.now().isoformat()
                     }, f, indent=2)
                     
                 # Mock manifests for reproducibility
