@@ -19,7 +19,7 @@ class StoryContinuityEngineStage(PipelineStage):
 
     def execute(self, context) -> StageResult:
         scene_manifest = None
-        for node in context.execution_nodes.values():
+        for node in context.execution_nodes:
             if isinstance(node.artifact, SceneManifest):
                 scene_manifest = node.artifact
                 break

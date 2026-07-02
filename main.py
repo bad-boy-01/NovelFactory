@@ -82,6 +82,7 @@ def main():
     renderer_provider = FFmpegVideoRenderer()
 
     # Import new stages
+    from core.planning.chunker import ChunkerStage
     from core.planning.scene_splitter import SceneSplitterStage
     from core.planning.shot_planner import ShotPlannerStage
     from core.planning.camera_planner import CameraPlannerStage
@@ -92,6 +93,7 @@ def main():
 
     # Stages need to expose get_providers for Executor lifecycle management
     sb_stage = StoryBibleGeneratorStage(llm_provider)
+    chunk_stage = ChunkerStage(chunk_size=2000, overlap=200)
     scene_stage = SceneSplitterStage(llm_provider)
     shot_stage = ShotPlannerStage(llm_provider)
     camera_stage = CameraPlannerStage()
@@ -119,7 +121,7 @@ def main():
     }
 
     if args.mode == "plan":
-        active_stages = [sb_stage, scene_stage, shot_stage, camera_stage, prompt_stage, valid_stage, timeline_stage]
+        active_stages = [sb_stage, chunk_stage, scene_stage, shot_stage, camera_stage, prompt_stage, valid_stage, timeline_stage]
     elif args.mode == "render":
         active_stages = [img_stage, render_stage]
     elif args.mode == "all":
@@ -127,7 +129,7 @@ def main():
         if args.stage != "all":
             active_stages = [stages_map[args.stage]]
         else:
-            active_stages = [sb_stage, scene_stage, shot_stage, camera_stage, prompt_stage, valid_stage, timeline_stage, img_stage, render_stage]
+            active_stages = [sb_stage, chunk_stage, scene_stage, shot_stage, camera_stage, prompt_stage, valid_stage, timeline_stage, img_stage, render_stage]
 
     router = ContractRouter({})
     executor = SequentialExecutor(stages=active_stages, contract_router=router, max_retries=2)
@@ -136,7 +138,7 @@ def main():
         final_context = executor.run(context)
         
         # Save intermediate artifacts
-        for node in final_context.execution_nodes.values():
+        for node in final_context.execution_nodes:
             art = node.artifact
             name = type(art).__name__
             if name == "StoryBible":

@@ -9,7 +9,7 @@ class CameraPlannerStage(PipelineStage):
         
     def execute(self, context) -> StageResult:
         shot_manifest = None
-        for node in context.execution_nodes.values():
+        for node in context.execution_nodes:
             if isinstance(node.artifact, ShotManifest):
                 shot_manifest = node.artifact
                 break

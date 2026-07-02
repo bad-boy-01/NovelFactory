@@ -18,7 +18,7 @@ class FFmpegAssemblyStage(PipelineStage):
         
     def execute(self, context) -> StageResult:
         timeline = None
-        for node in context.execution_nodes.values():
+        for node in context.execution_nodes:
             if isinstance(node.artifact, Timeline):
                 timeline = node.artifact
                 break

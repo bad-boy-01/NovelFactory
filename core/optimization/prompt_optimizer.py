@@ -33,7 +33,7 @@ class PromptOptimizerStage(PipelineStage):
 
     def execute(self, context) -> StageResult:
         prompt_manifest = None
-        for node in context.execution_nodes.values():
+        for node in context.execution_nodes:
             if isinstance(node.artifact, PromptManifest):
                 prompt_manifest = node.artifact
                 break

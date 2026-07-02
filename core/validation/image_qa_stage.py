@@ -19,7 +19,7 @@ class ImageQAStage(PipelineStage):
         asset_registry = None
         prompt_manifest = None
         
-        for node in context.execution_nodes.values():
+        for node in context.execution_nodes:
             if isinstance(node.artifact, AssetRegistry):
                 asset_registry = node.artifact
             elif isinstance(node.artifact, PromptManifest):

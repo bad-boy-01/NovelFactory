@@ -32,7 +32,7 @@ class AudioGenerationStage(PipelineStage):
         os.makedirs(self.output_dir, exist_ok=True)
             
         scene_manifest = None
-        for node in context.execution_nodes.values():
+        for node in context.execution_nodes:
             if isinstance(node.artifact, SceneManifest):
                 scene_manifest = node.artifact
                 break

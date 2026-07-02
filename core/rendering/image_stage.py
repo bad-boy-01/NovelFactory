@@ -1,4 +1,4 @@
-﻿from core.pipeline.stage import PipelineStage, StageResult
+from core.pipeline.stage import PipelineStage, StageResult
 from core.domain.assets.execution import ExecutionNode
 from core.domain.prompt.ast import PromptManifest
 from core.domain.assets.registry import AssetRegistry, Asset
@@ -51,7 +51,7 @@ class DiffusionRendererStage(PipelineStage):
             self.diffusion = LocalDiffusionProvider()
             
         prompt_manifest = None
-        for node in context.execution_nodes.values():
+        for node in context.execution_nodes:
             if isinstance(node.artifact, PromptManifest):
                 prompt_manifest = node.artifact
                 break

@@ -28,7 +28,7 @@ class ShotPlannerStage(PipelineStage):
             self.llm = LocalLLMProvider()
             
         scene_manifest = None
-        for node in context.execution_nodes.values():
+        for node in context.execution_nodes:
             if isinstance(node.artifact, SceneManifest):
                 scene_manifest = node.artifact
                 break

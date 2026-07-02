@@ -13,7 +13,7 @@ class PromptBuilderStage(PipelineStage):
         shot_manifest = None
         bible = None
         
-        for node in context.execution_nodes.values():
+        for node in context.execution_nodes:
             if isinstance(node.artifact, ShotManifest):
                 shot_manifest = node.artifact
             elif isinstance(node.artifact, StoryBible):

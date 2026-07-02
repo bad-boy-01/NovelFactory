@@ -11,7 +11,7 @@ class PromptValidatorStage(PipelineStage):
 
     def execute(self, context) -> StageResult:
         prompt_manifest = None
-        for node in context.execution_nodes.values():
+        for node in context.execution_nodes:
             if isinstance(node.artifact, PromptManifest) and getattr(node.artifact, "generator", "") == "PromptOptimizerStage":
                 prompt_manifest = node.artifact
                 break

@@ -21,7 +21,7 @@ class SceneSplitterStage(PipelineStage):
             self.llm = LocalLLMProvider()
             
         chunker_manifest = None
-        for node in context.execution_nodes.values():
+        for node in context.execution_nodes:
             if isinstance(node.artifact, ChunkerManifest):
                 chunker_manifest = node.artifact
                 break

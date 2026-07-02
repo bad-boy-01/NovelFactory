@@ -16,7 +16,7 @@ class ValidatorStage(PipelineStage):
         prompt_manifest = None
         shot_manifest = None
         
-        for node in context.execution_nodes.values():
+        for node in context.execution_nodes:
             if isinstance(node.artifact, PromptManifest):
                 prompt_manifest = node.artifact
             elif isinstance(node.artifact, ShotManifest):

@@ -1,10 +1,10 @@
-﻿import json
+import json
 from collections import defaultdict
 
 class CompilerReporter:
     def _extract_artifacts(self, context):
         artifacts = {}
-        for node in context.execution_nodes.values():
+        for node in context.execution_nodes:
             name = type(node.artifact).__name__
             artifacts[name] = node.artifact
         return artifacts
@@ -59,12 +59,12 @@ class CompilerReporter:
         if bible:
             lines.append("Characters:")
             for char in bible.characters:
-                lines.append(f"✓ {char.name}")
+                lines.append(f"? {char.name}")
             lines.append("")
             
             lines.append("Locations:")
             for loc in bible.locations:
-                lines.append(f"✓ {loc.name}")
+                lines.append(f"? {loc.name}")
             lines.append("")
             
         lines.append("Warnings:")
