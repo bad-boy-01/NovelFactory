@@ -9,6 +9,17 @@ class StoryBibleGeneratorStage:
     def get_providers(self) -> list:
         return [self.llm]
 
+    def get_dependency_hash(self, context) -> str:
+        import hashlib
+        return hashlib.sha256(context.project_manifest.source_text.encode("utf-8")).hexdigest()
+        
+    def load_cached_artifact(self, workspace):
+        import json
+        cached = workspace.load_json("manifests/story_bible.json")
+        if cached:
+            return StoryBible.model_validate(cached)
+        return None
+
     def execute(self, context) -> StageResult:
         schema = {
             "characters": [
@@ -22,7 +33,6 @@ class StoryBibleGeneratorStage:
         }
         
         raw_text = context.project_manifest.source_text
-        # Safety limit for Milestone 1: Truncate massive novels to prevent OOM during generation
         if len(raw_text) > 10000:
             raw_text = raw_text[:10000] + "\n...[TRUNCATED]"
             
@@ -31,7 +41,22 @@ class StoryBibleGeneratorStage:
         result_dict = self.llm.generate_json(prompt, schema)
         
         chars = {c["name"]: CharacterReference(**c) for c in result_dict.get("characters", [])}
-        bible = StoryBible(characters=chars)
+        
+        # Incremental compilation metadata
+        import hashlib
+        dep_hash = self.get_dependency_hash(context)
+        bible = StoryBible(
+            characters=chars,
+            dependency_hash=dep_hash,
+            generator="StoryBibleGeneratorStage",
+            pipeline_version="0.4.4"
+        )
+        # Compute own fingerprint
+        bible.fingerprint = hashlib.sha256(bible.model_dump_json(exclude={"fingerprint", "created_at"}).encode()).hexdigest()
+        
+        # Save to Workspace
+        if hasattr(context, "workspace"):
+            context.workspace.save_json("manifests/story_bible.json", bible.model_dump(mode="json"))
         
         node = ExecutionNode(artifact=bible, stage_name="StoryBibleGeneratorStage")
         

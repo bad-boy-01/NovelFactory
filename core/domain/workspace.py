@@ -14,6 +14,7 @@ class WorkspaceManager:
         self.assets_dir = self.cache_dir / "assets"
         self.outputs_dir = self.base_dir / "outputs"
         self.temp_dir = self.base_dir / "temp"
+        self.manifests_dir = self.base_dir / "manifests"
         
         self._initialize_directories()
 
@@ -24,6 +25,7 @@ class WorkspaceManager:
         self.assets_dir.mkdir(parents=True, exist_ok=True)
         self.outputs_dir.mkdir(parents=True, exist_ok=True)
         self.temp_dir.mkdir(parents=True, exist_ok=True)
+        self.manifests_dir.mkdir(parents=True, exist_ok=True)
 
     def get_asset_dir(self, asset_hash: str) -> Path:
         """Returns the directory for a specific asset hash, creating it if needed."""

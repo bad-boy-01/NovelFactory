@@ -77,7 +77,6 @@ class LocalLLMProvider(LLMProvider):
     # JSON GENERATION CORE
     # -------------------------
     def generate_json(self, prompt: str, schema: dict) -> dict:
-
         full_prompt = f"""You are a strict JSON generator. Output ONLY a single valid JSON object.
 Do NOT output a JSON array at the top level.
 Do NOT include any explanation, markdown, or code fences.
@@ -92,6 +91,21 @@ TASK:
 JSON OUTPUT:
 """
 
+        temperature = 0.3
+        
+        # LLM Response Cache
+        import hashlib
+        from pathlib import Path
+        cache_key = hashlib.sha256(f"{full_prompt}_{temperature}_{self.model_id}".encode()).hexdigest()
+        cache_dir = Path("workspace/cache/llm")
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_file = cache_dir / f"{cache_key}.json"
+        
+        if cache_file.exists():
+            print(f"[LLM] Prompt Cache HIT ({cache_key[:8]})", flush=True)
+            with open(cache_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+
         inputs = self.tokenizer(
             full_prompt,
             return_tensors="pt",
@@ -100,12 +114,12 @@ JSON OUTPUT:
         ).to(self.model.device)
 
         n_prompt_tokens = inputs.input_ids.shape[1]
-        print(f"[LLM] Generating... ({n_prompt_tokens} prompt tokens)", flush=True)
+        print(f"[LLM] Generating... ({n_prompt_tokens} prompt tokens) (Cache MISS: {cache_key[:8]})", flush=True)
 
         output = self.model.generate(
             **inputs,
             max_new_tokens=512,
-            temperature=0.3,
+            temperature=temperature,
             top_p=0.9,
             do_sample=True,
         )
@@ -117,8 +131,13 @@ JSON OUTPUT:
         print(f"[LLM] Raw output ({len(decoded)} chars): {decoded[:120]!r}", flush=True)
 
         json_text = self._extract_json(decoded)
+        result = json.loads(json_text)
+        
+        # Save to LLM Cache
+        with open(cache_file, "w", encoding="utf-8") as f:
+            json.dump(result, f, indent=2)
 
-        return json.loads(json_text)
+        return result
 
     # -------------------------
     # SAFE JSON EXTRACTION

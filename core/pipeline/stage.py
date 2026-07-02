@@ -34,8 +34,13 @@ class PipelineStage(Protocol):
         ...
         
     def execute(self, context: PipelineContext) -> StageResult:
-        """
-        Executes the stage logic without mutating the context directly,
-        returning a StageResult that the executor will later commit.
-        """
+        """Executes the core logic of the stage."""
         ...
+        
+    def get_dependency_hash(self, context: PipelineContext) -> str:
+        """Returns a stable hash representing the inputs to this stage."""
+        return "none"
+        
+    def load_cached_artifact(self, workspace) -> Any:
+        """Loads a previously cached artifact for this stage, if it exists."""
+        return None

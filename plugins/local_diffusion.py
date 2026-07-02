@@ -28,59 +28,77 @@ class MockProvider(ImageGenerationProvider):
     def unload(self) -> None:
         pass
 
-class SDXLLightningProvider(ImageGenerationProvider):
+class DiffusersProvider(ImageGenerationProvider):
     def __init__(self, config: DiffusionConfig = None):
-        self.config = config or DiffusionConfig()
+        # We assume config is actually a ModelConfig in the new architecture
+        self.config = config
         self.pipeline = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
+    def capabilities(self):
+        from plugins.interfaces import ProviderCapability
+        return ProviderCapability(image=True, lora=bool(self.config.adapter))
+        
     def load(self) -> None:
         if self.pipeline is not None:
-            logger.info("[Resource] SDXL Lightning already resident in VRAM.")
+            logger.info(f"[Resource] Model {self.config.model_id} already resident in VRAM.")
             return
             
-        logger.info("[Resource] Loading SDXL Lightning into VRAM...")
+        logger.info(f"[Resource] Loading {self.config.model_id} into VRAM...")
         
-        # We use a 4-step UNet from ByteDance for SDXL Lightning
-        unet = UNet2DConditionModel.from_pretrained(
-            "ByteDance/SDXL-Lightning",
-            subfolder="unet",
-            torch_dtype=self.config.dtype,
-            cache_dir=self.config.cache_dir
-        )
+        unet = None
+        if self.config.adapter and "SDXL-Lightning" in self.config.adapter:
+            # Handle specific adapter logic
+            unet = UNet2DConditionModel.from_pretrained(
+                self.config.adapter,
+                subfolder="unet",
+                torch_dtype=getattr(torch, self.config.dtype, torch.float16),
+                cache_dir=self.config.cache_dir
+            )
         
-        self.pipeline = StableDiffusionXLPipeline.from_pretrained(
-            self.config.model_id,
-            unet=unet,
-            torch_dtype=self.config.dtype,
-            variant="fp16",
-            use_safetensors=True,
-            cache_dir=self.config.cache_dir
-        )
-        
+        # Load the base model
+        if unet:
+            self.pipeline = StableDiffusionXLPipeline.from_pretrained(
+                self.config.model_id,
+                unet=unet,
+                torch_dtype=getattr(torch, self.config.dtype, torch.float16),
+                variant="fp16",
+                use_safetensors=True,
+                cache_dir=self.config.cache_dir
+            )
+        else:
+            self.pipeline = StableDiffusionXLPipeline.from_pretrained(
+                self.config.model_id,
+                torch_dtype=getattr(torch, self.config.dtype, torch.float16),
+                variant="fp16",
+                use_safetensors=True,
+                cache_dir=self.config.cache_dir
+            )
+            
         if self.device == "cuda":
             if self.config.cpu_offload:
                 self.pipeline.enable_model_cpu_offload()
             else:
                 self.pipeline.to("cuda")
                 
-        # Warmup
-        logger.info("[Resource] Warming up SDXL Lightning...")
-        preset = self._get_warmup_preset()
-        self._generate_internal("warmup", "", 42, preset)
+        self.warmup()
         
-    def _get_warmup_preset(self):
+    def warmup(self) -> None:
+        logger.info("[Resource] Warming up model...")
         from core.domain.rendering.presets import RenderPreset
-        return RenderPreset(width=256, height=256, steps=1, cfg=0.0)
+        preset = RenderPreset(width=256, height=256, steps=1, cfg=0.0)
+        self._generate_internal("warmup", "", 42, preset)
         
     def _generate_internal(self, prompt, negative, seed, preset, callback=None):
         generator = torch.Generator(device=self.device).manual_seed(seed)
         
-        # Instantiate scheduler from class
-        self.pipeline.scheduler = preset.scheduler_class.from_config(
-            self.pipeline.scheduler.config, 
-            timestep_spacing="trailing"
-        )
+        # Instantiate scheduler from string
+        if preset.sampler == "euler":
+            self.pipeline.scheduler = EulerDiscreteScheduler.from_config(
+                self.pipeline.scheduler.config, 
+                timestep_spacing="trailing"
+            )
+        # We can add more samplers later
         
         def cb_wrapper(step, timestep, latents):
             if callback:
@@ -101,7 +119,7 @@ class SDXLLightningProvider(ImageGenerationProvider):
         return image
         
     def generate(self, job: RenderJob, callback=None) -> Image.Image:
-        logger.info(f"SDXL Lightning Generating: {job.prompt[:40]}...")
+        logger.info(f"Generating ({self.config.model_id}): {job.prompt[:40]}...")
         return self._generate_internal(job.prompt, job.negative_prompt, job.seed, job.preset, callback)
         
     def health_check(self) -> ProviderHealth:
@@ -110,17 +128,17 @@ class SDXLLightningProvider(ImageGenerationProvider):
         return ProviderHealth(
             loaded=loaded, 
             device=self.device, 
-            model="SDXL-Lightning", 
-            dtype=str(self.config.dtype), 
+            model=self.config.model_id, 
+            dtype=self.config.dtype, 
             vram_allocated_gb=vram
         )
         
     def unload(self) -> None:
-        logger.info("[Resource] Unloading SDXL Lightning...")
+        logger.info(f"[Resource] Unloading {self.config.model_id}...")
         if self.pipeline:
             del self.pipeline
             self.pipeline = None
         from core.utils.vram import flush_vram
         flush_vram("Diffusion unloaded")
 
-LocalDiffusionProvider = SDXLLightningProvider
+LocalDiffusionProvider = DiffusersProvider

@@ -38,7 +38,22 @@ class ProviderHealth(BaseModel):
     dtype: str
     vram_allocated_gb: float
 
+class ProviderCapability(BaseModel):
+    image: bool = False
+    video: bool = False
+    img2img: bool = False
+    controlnet: bool = False
+    inpainting: bool = False
+    ipadapter: bool = False
+    lora: bool = False
+
 class ImageGenerationProvider(Protocol):
+    def capabilities(self) -> ProviderCapability:
+        ...
+        
+    def warmup(self) -> None:
+        ...
+        
     def load(self) -> None:
         ...
         

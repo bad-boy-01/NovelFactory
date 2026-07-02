@@ -113,13 +113,12 @@ class DiffusionRendererStage(PipelineStage):
                 prompt_str = f"{ast.subject.description}, {ast.environment.location}, {ast.camera.distance} {ast.camera.angle}, {ast.lighting.style}, {ast.composition.style}, {style_tags}"
                 
                 from core.domain.rendering.presets import RenderJob, RenderPreset
-                from diffusers import EulerDiscreteScheduler
                 preset = RenderPreset(
                     width=1024,
                     height=1024,
                     steps=ast.technical.steps,
                     cfg=0.0, # ByteDance Lightning recommends 0 CFG
-                    scheduler_class=EulerDiscreteScheduler,
+                    sampler="euler",
                     negative_prompt=negative_str
                 )
                 

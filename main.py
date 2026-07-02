@@ -166,17 +166,20 @@ def main():
         final_context = compiler_context
         
         if args.mode in ["plan", "all"] and args.stage == "all":
-            executor_plan = SequentialExecutor(stages=planning_stages, contract_router=router, max_retries=2)
+            from core.rendering.executor import CompilerExecutor
+            executor_plan = CompilerExecutor(stages=planning_stages, contract_router=router, max_retries=2)
             with ResourceSession(resources=[llm_provider]):
                 final_context = executor_plan.run(final_context)
                 
         if args.mode in ["render", "all"] and args.stage == "all":
-            executor_render = SequentialExecutor(stages=rendering_stages, contract_router=router, max_retries=2)
+            from core.rendering.executor import CompilerExecutor
+            executor_render = CompilerExecutor(stages=rendering_stages, contract_router=router, max_retries=2)
             with ResourceSession(resources=[diffusion_provider]):
                 final_context = executor_render.run(final_context)
             
         if args.stage != "all":
-            executor_single = SequentialExecutor(stages=active_stages, contract_router=router, max_retries=2)
+            from core.rendering.executor import CompilerExecutor
+            executor_single = CompilerExecutor(stages=active_stages, contract_router=router, max_retries=2)
             with ResourceSession(resources=[llm_provider]): # Best effort for single stage
                 final_context = executor_single.run(final_context)
 

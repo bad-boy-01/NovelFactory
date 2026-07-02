@@ -1,6 +1,5 @@
 from pydantic import BaseModel
-from typing import Any, Callable, Optional
-from diffusers import EulerDiscreteScheduler
+from typing import Optional
 
 class RenderPreset(BaseModel):
     name: str = "lightning"
@@ -8,8 +7,16 @@ class RenderPreset(BaseModel):
     height: int = 1024
     steps: int = 4
     cfg: float = 0.0
-    scheduler_class: Any = EulerDiscreteScheduler
+    sampler: str = "euler"
     negative_prompt: str = ""
+    
+class ModelConfig(BaseModel):
+    model_id: str = "stabilityai/stable-diffusion-xl-base-1.0"
+    adapter: Optional[str] = "ByteDance/SDXL-Lightning"
+    vae: Optional[str] = None
+    cache_dir: str = "/kaggle/working/hf_cache"
+    dtype: str = "float16"
+    cpu_offload: bool = True
     
 class RenderJob(BaseModel):
     prompt: str
