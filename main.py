@@ -8,9 +8,8 @@ from core.pipeline.context import PipelineContext
 from core.domain.story.project import ProjectManifest
 from plugins.local_llm import LocalLLMProvider
 from core.planning.story_bible_stage import StoryBibleGeneratorStage
-from plugins.local_diffusion import DiffusionProvider
+from plugins.local_diffusion import LocalDiffusionProvider
 from plugins.interfaces import DiffusionConfig
-from core.rendering.image_stage import ImageGenerationStage
 from core.pipeline.cache import CacheProvider
 from core.optimization.prompt_builder import PromptBuilderStage
 from plugins.ffmpeg_renderer import FFmpegVideoRenderer
@@ -42,9 +41,10 @@ def main():
         context = PipelineContext(project_manifest=manifest)
         llm = LocalLLMProvider()
         cache = CacheProvider(".cache")
-        diff = DiffusionProvider(DiffusionConfig(cpu_offload=True))
+        diff = LocalDiffusionProvider(DiffusionConfig(cpu_offload=True))
         rend = FFmpegVideoRenderer()
-        stages = [StoryBibleGeneratorStage(llm), PromptBuilderStage(), ImageGenerationStage(diff, cache), RenderingStage(rend)]
+        from core.rendering.image_stage import DiffusionRendererStage
+        stages = [StoryBibleGeneratorStage(llm), PromptBuilderStage(), DiffusionRendererStage(diffusion_provider=diff), RenderingStage(rend)]
         router = ContractRouter({})
         from core.pipeline.reducer import ContextReducer
         from core.pipeline.stage import StageResult
@@ -78,7 +78,7 @@ def main():
     llm_provider = LocalLLMProvider() 
     cache_provider = CacheProvider(cache_dir=".cache/generation")
     diff_config = DiffusionConfig(cpu_offload=True) 
-    diffusion_provider = DiffusionProvider(config=diff_config)
+    diffusion_provider = LocalDiffusionProvider(config=diff_config)
     renderer_provider = FFmpegVideoRenderer()
 
     # Import new stages

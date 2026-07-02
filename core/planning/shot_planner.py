@@ -11,6 +11,14 @@ class ShotPlannerStage(PipelineStage):
     def __init__(self, llm_provider=None):
         self.llm = llm_provider
 
+    def get_name(self) -> str:
+        return "ShotPlannerStage"
+
+    def fingerprint(self, context) -> str:
+        # Generate a fingerprint based on the class name and provider type
+        base = f"{self.get_name()}_{type(self.llm).__name__ if self.llm else 'default'}"
+        return hashlib.sha256(base.encode('utf-8')).hexdigest()
+
     def get_providers(self) -> list:
         return [self.llm] if self.llm else []
         

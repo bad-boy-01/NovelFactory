@@ -1,7 +1,7 @@
 import logging
 from typing import List
-from .context import PipelineContext
-from .stage import PipelineStage
+from core.pipeline.context import PipelineContext
+from core.pipeline.stage import PipelineStage
 from core.contracts.engine import ContractEngine
 from core.contracts.router import ContractRouter
 
