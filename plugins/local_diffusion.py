@@ -8,34 +8,77 @@ import gc
 
 logger = logging.getLogger(__name__)
 
+from core.domain.prompt.render_plan import RenderPlan
+from core.domain.prompt.provider_request import ProviderRequest, ImageRequest
+from plugins.interfaces import ProviderCompiler
+
+class MockCompiler(ProviderCompiler):
+    def compile_plan(self, plan: RenderPlan) -> ProviderRequest:
+        return ImageRequest(
+            positive_prompt="Mock Image based on plan",
+            negative_prompt="",
+            width=plan.physical.width,
+            height=plan.physical.height,
+            steps=plan.physical.steps,
+            cfg=plan.physical.cfg,
+            seed=plan.physical.seed
+        )
+
 class MockProvider(ImageGenerationProvider):
-    def __init__(self, config: DiffusionConfig = None):
-        self.config = config or DiffusionConfig()
+    def __init__(self):
+        self.loaded = False
         
     def load(self) -> None:
         pass
         
-    def compile_prompt(self, visual_scene: 'VisualScene') -> RenderJob:
-        from core.domain.rendering.presets import RenderPreset
-        return RenderJob(
-            prompt="Mock Image",
-            negative_prompt="",
-            seed=0,
-            preset=RenderPreset()
-        )
-        
-    def generate(self, job: RenderJob, callback=None) -> Image.Image:
-        logger.info(f"Mock Generating: {job.prompt[:30]}...")
+    def generate(self, request: ProviderRequest, callback=None) -> Image.Image:
+        logger.info(f"Mock Generating: {getattr(request, 'positive_prompt', 'Mock')}...")
         if callback:
-            for i in range(job.preset.steps):
-                callback(i, job.preset.steps)
-        return Image.new('RGB', (job.preset.width, job.preset.height), color='green')
+            for i in range(getattr(request, 'steps', 10)):
+                callback(i, getattr(request, 'steps', 10))
+        return Image.new('RGB', (getattr(request, 'width', 1024), getattr(request, 'height', 1024)), color='green')
         
     def health_check(self) -> ProviderHealth:
         return ProviderHealth(loaded=True, device="cpu", model="mock", dtype="none", vram_allocated_gb=0.0)
         
     def unload(self) -> None:
         pass
+
+class DiffusersCompiler(ProviderCompiler):
+    def __init__(self, config: DiffusionConfig = None):
+        self.config = config
+
+    def compile_plan(self, plan: RenderPlan) -> ProviderRequest:
+        # Build SDXL Prompt from LogicalRenderPlan
+        logical = plan.logical
+        
+        # 1. Subject (Highest Weight)
+        sections = []
+        if logical.subject:
+            sections.append(f"({logical.subject}:1.2)")
+            
+        # 2. Framing & Atmosphere
+        if logical.framing:
+            sections.append(f"({logical.framing}:1.1)")
+        if logical.mood:
+            sections.append(f"({logical.mood}:1.0)")
+        if logical.emphasis:
+            sections.append(f"({logical.emphasis}:0.9)")
+            
+        prompt_str = " ".join(sections)
+        negative_str = "low quality, blurry, distorted, bad anatomy, watermark"
+        
+        return ImageRequest(
+            positive_prompt=prompt_str,
+            negative_prompt=negative_str,
+            width=plan.physical.width,
+            height=plan.physical.height,
+            steps=plan.physical.steps,
+            cfg=0.0 if self.config and self.config.adapter and "Lightning" in self.config.adapter else plan.physical.cfg,
+            seed=plan.physical.seed,
+            loras=plan.physical.loras,
+            controlnets=plan.physical.controlnets
+        )
 
 class DiffusersProvider(ImageGenerationProvider):
     def __init__(self, config: DiffusionConfig = None):
@@ -44,57 +87,32 @@ class DiffusersProvider(ImageGenerationProvider):
         self.pipeline = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
-    def compile_prompt(self, visual_scene: 'VisualScene') -> RenderJob:
-        from core.domain.rendering.presets import RenderJob, RenderPreset
-        
-        # Build SDXL Prompt using ordered sections with weights
-        sections = []
-        
-        # 1. Subject (Highest Weight)
-        sections.append(f"({visual_scene.subject}:1.2)")
-        
-        # 2. Characters
-        char_desc = []
-        for c in visual_scene.characters:
-            char_str = f"{c.name}, {c.appearance}, {c.wardrobe}, {c.pose}, {c.emotion}"
-            char_desc.append(f"({char_str}:1.1)")
-        if char_desc:
-            sections.append(" ".join(char_desc))
+    def generate(self, request: ProviderRequest, callback=None) -> Image.Image:
+        if not self.pipeline:
+            self.load()
             
-        # 3. Environment
-        env = visual_scene.environment
-        env_str = f"{env.location_desc}, {env.time}, {env.weather}, {env.lighting}, {env.palette}, {env.environment_state}"
-        sections.append(f"({env_str}:1.0)")
+        import torch
+        generator = torch.Generator(device=self.device).manual_seed(request.seed)
         
-        # 4. Camera & Lighting & Composition
-        cam = visual_scene.camera
-        style = visual_scene.style
-        cam_str = f"{cam.distance} {cam.angle} shot, {cam.lens}"
-        sections.append(f"({cam_str}, {style.composition}, {style.lighting_style}, {style.color_grade}:0.9)")
+        logger.info(f"[Inference] Running generation for seed {request.seed} with {request.steps} steps.")
         
-        # 5. Quality
-        quality_str = ", ".join(style.quality_tags)
-        sections.append(f"({quality_str}:0.8)")
+        def step_callback(step: int, timestep: int, latents: torch.Tensor):
+            if callback:
+                callback(step, request.steps)
+                
+        image = self.pipeline(
+            prompt=request.positive_prompt,
+            negative_prompt=request.negative_prompt,
+            num_inference_steps=request.steps,
+            guidance_scale=request.cfg,
+            generator=generator,
+            width=request.width,
+            height=request.height,
+            callback=step_callback,
+            callback_steps=1
+        ).images[0]
         
-        prompt_str = " ".join(sections)
-        negative_str = ", ".join(style.negative_tags)
-        
-        preset = RenderPreset(
-            width=visual_scene.width,
-            height=visual_scene.height,
-            steps=visual_scene.steps,
-            cfg=visual_scene.cfg if not (self.config.adapter and "Lightning" in self.config.adapter) else 0.0,
-            sampler=visual_scene.sampler,
-            negative_prompt=negative_str
-        )
-        
-        return RenderJob(
-            prompt=prompt_str,
-            negative_prompt=negative_str,
-            seed=0, # The executor overwrites the seed
-            preset=preset
-        )
-        
+        return image
     def capabilities(self):
         from plugins.interfaces import ProviderCapability
         return ProviderCapability(image=True, lora=bool(self.config.adapter))

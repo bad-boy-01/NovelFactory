@@ -14,6 +14,15 @@ class AssetStatus(Enum):
     STALE_METADATA = "stale_metadata"
     ORPHANED = "orphaned"
     
+class ArtifactType(Enum):
+    IMAGE = "IMAGE"
+    VIDEO = "VIDEO"
+    PROMPT = "PROMPT"
+    MASK = "MASK"
+    DEPTH = "DEPTH"
+    LATENT = "LATENT"
+    UPSCALE = "UPSCALE"
+    
 class AssetDependencies(BaseModel):
     prompt_manifest_hash: str = ""
     character_render_state_hash: str = ""
@@ -22,7 +31,10 @@ class AssetDependencies(BaseModel):
 
 class Asset(BaseModel):
     asset_id: str
-    type: str # "image", "audio", "video"
+    type: ArtifactType
+    version: int = 1
+    derived_from: Optional[str] = None # Lineage: ID of previous version asset
+
     path: str
     checksum: str
     prompt_hash: str

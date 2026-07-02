@@ -60,9 +60,17 @@ class PromptFingerprint(BaseModel):
         import hashlib
         return hashlib.sha256(self.model_dump_json().encode()).hexdigest()
 
+from core.domain.prompt.render_plan import RenderPlan
+from core.domain.prompt.provider_request import ProviderRequest
+
+class ProviderCompiler(Protocol):
+    def compile_plan(self, plan: RenderPlan) -> ProviderRequest:
+        """Compiles a provider-agnostic RenderPlan into a backend-specific ProviderRequest."""
+        ...
+
 class ImageGenerationProvider(Protocol):
-    def compile_prompt(self, visual_scene: 'VisualScene') -> 'RenderJob':
-        """Compiles a fully resolved VisualScene into a provider-specific RenderJob."""
+    def generate(self, request: ProviderRequest, callback: Callable[[int, int], None] = None) -> Image.Image:
+        """Executes a fully compiled ProviderRequest."""
         ...
         
     def capabilities(self) -> ProviderCapability:
