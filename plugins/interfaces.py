@@ -39,13 +39,26 @@ class ProviderHealth(BaseModel):
     vram_allocated_gb: float
 
 class ProviderCapability(BaseModel):
-    image: bool = False
-    video: bool = False
-    img2img: bool = False
-    controlnet: bool = False
-    inpainting: bool = False
-    ipadapter: bool = False
-    lora: bool = False
+    modality: str = "image"
+    max_resolution: tuple[int, int] = (2048, 2048)
+    supports_lora: bool = False
+    supports_controlnet: bool = False
+    supports_img2img: bool = False
+    supports_ip_adapter: bool = False
+    supports_inpainting: bool = False
+
+class PromptFingerprint(BaseModel):
+    provider_name: str
+    provider_version: str
+    prompt_hash: str
+    model_hash: str
+    sampling_hash: str
+    schema_hash: str
+    
+    @property
+    def key(self) -> str:
+        import hashlib
+        return hashlib.sha256(self.model_dump_json().encode()).hexdigest()
 
 class ImageGenerationProvider(Protocol):
     def capabilities(self) -> ProviderCapability:

@@ -42,7 +42,30 @@ def main():
     parser.add_argument("--render-shot", type=str, help="Specific shot to render, e.g., '31'")
     parser.add_argument("--render-scene", type=str, help="Specific scene to render, e.g., '4'")
     parser.add_argument("--render-shots", type=str, help="Range of shots to render, e.g., '20-28'")
+    parser.add_argument("--inspect", type=str, help="Inspect a compiled manifest by name or path (e.g., 'story_bible' or 'workspace/manifests/story_bible.json')")
     args = parser.parse_args()
+
+    if args.inspect:
+        target = args.inspect
+        if not target.endswith(".json"):
+            target = f"workspace/manifests/{target}.json"
+        
+        path = Path(target)
+        if not path.exists():
+            logger.error(f"[ERROR] Artifact not found at {path}")
+            sys.exit(1)
+            
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            
+        metadata = data.get("metadata", {})
+        print("="*50)
+        print(f"MANIFEST INSPECTOR: {path.name}")
+        print("="*50)
+        for k, v in metadata.items():
+            print(f"{k:<25} : {v}")
+        print("="*50)
+        sys.exit(0)
 
     if args.stage == "validate":
         logger.info("[VALIDATE] Running architectural sanity check...")

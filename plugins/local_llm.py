@@ -92,11 +92,28 @@ JSON OUTPUT:
 """
 
         temperature = 0.3
+        top_p = 0.9
         
-        # LLM Response Cache
+        # LLM Response Cache with PromptFingerprint
         import hashlib
         from pathlib import Path
-        cache_key = hashlib.sha256(f"{full_prompt}_{temperature}_{self.model_id}".encode()).hexdigest()
+        from plugins.interfaces import PromptFingerprint
+        
+        prompt_hash = hashlib.sha256(full_prompt.encode()).hexdigest()
+        model_hash = hashlib.sha256(self.model_id.encode()).hexdigest()
+        sampling_hash = hashlib.sha256(f"temp={temperature}_top_p={top_p}_max_tokens=512_seed=42".encode()).hexdigest()
+        schema_hash = hashlib.sha256(json.dumps(schema, sort_keys=True).encode()).hexdigest()
+        
+        fingerprint = PromptFingerprint(
+            provider_name="LocalLLMProvider",
+            provider_version="transformers-pipeline",
+            prompt_hash=prompt_hash,
+            model_hash=model_hash,
+            sampling_hash=sampling_hash,
+            schema_hash=schema_hash
+        )
+        
+        cache_key = fingerprint.key
         cache_dir = Path("workspace/cache/llm")
         cache_dir.mkdir(parents=True, exist_ok=True)
         cache_file = cache_dir / f"{cache_key}.json"

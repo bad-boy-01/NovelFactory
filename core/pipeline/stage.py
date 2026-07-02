@@ -12,35 +12,51 @@ class StageResult(Generic[T]):
     metadata: Mapping[str, Any]
 
 
-class PipelineStage(Protocol):
+from enum import Enum
+from abc import ABC, abstractmethod
+
+class CachePolicy(Enum):
+    ALWAYS = "ALWAYS"
+    FINGERPRINT = "FINGERPRINT"
+    NEVER = "NEVER"
+    EXTERNAL = "EXTERNAL"
+
+class CompilerStage(ABC):
     """
-    A single stage in the AI pipeline.
-    Must implement execute() to return a StageResult.
+    A single stage in the AI compiler pipeline.
     """
     
+    @abstractmethod
     def get_name(self) -> str:
         """Returns the human-readable name of the stage."""
-        ...
+        pass
         
     def get_providers(self) -> list:
         """Returns a list of providers used by this stage, so the executor can manage their lifecycle."""
         return []
         
-    def fingerprint(self, context: PipelineContext) -> str:
-        """
-        Returns a deterministic hash based on inputs, config, and model versions.
-        Used by the executor to skip unchanged stages via caching.
-        """
-        ...
+    @abstractmethod
+    def inputs(self, context: PipelineContext) -> list[Any]:
+        """Returns the specific parent artifacts or data this stage depends on."""
+        pass
         
+    @abstractmethod
+    def outputs(self) -> list[str]:
+        """Returns the artifact types or names this stage produces."""
+        pass
+        
+    @abstractmethod
+    def generator_signature(self) -> str:
+        """Returns the signature of the generator (e.g. Qwen1.5-4B + PromptBuilder v2.3)."""
+        pass
+        
+    def cache_policy(self) -> CachePolicy:
+        """Returns the cache policy for this stage. Defaults to FINGERPRINT."""
+        return CachePolicy.FINGERPRINT
+        
+    @abstractmethod
     def execute(self, context: PipelineContext) -> StageResult:
         """Executes the core logic of the stage."""
-        ...
-        
-    def get_dependency_hash(self, context: PipelineContext) -> str:
-        """Returns a stable hash representing the inputs to this stage."""
-        return "none"
-        
-    def load_cached_artifact(self, workspace) -> Any:
-        """Loads a previously cached artifact for this stage, if it exists."""
-        return None
+        pass
+
+PipelineStage = CompilerStage  # Alias for backward compatibility
