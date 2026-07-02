@@ -1,6 +1,9 @@
 from core.pipeline.stage import PipelineStage, StageResult
 from core.domain.assets.execution import ExecutionNode
-from core.domain.prompt.ast import PromptManifest, PromptManifestEntry, PromptAST, CameraAST
+from core.domain.prompt.ast import (
+    PromptManifest, PromptManifestEntry, PromptAST, CameraAST,
+    SubjectAST, EnvironmentAST, LightingAST, CompositionAST, QualityAST, NegativeAST
+)
 from core.domain.scene.manifest import ShotManifest
 from core.domain.story.bible import StoryBible
 import hashlib
@@ -29,9 +32,9 @@ class PromptBuilderStage(PipelineStage):
             seed = int(seed_hash, 16) % (2**32 - 1)
             
             ast = PromptAST(
-                subject="Korean Manhwa scene",
+                subject=SubjectAST(description="Korean Manhwa scene"),
                 characters=[],
-                environment="Determined by scene",
+                environment=EnvironmentAST(location="Determined by scene"),
                 camera=CameraAST(
                     type=shot.camera_type,
                     lens=shot.lens,
@@ -39,10 +42,10 @@ class PromptBuilderStage(PipelineStage):
                     distance=shot.distance,
                     movement=shot.movement
                 ),
-                lighting="soft cinematic lighting",
-                composition="rule of thirds",
-                style="anime cinematic, high detail",
-                negative="low quality, blurry, distorted"
+                lighting=LightingAST(style="soft cinematic lighting"),
+                composition=CompositionAST(style="rule of thirds"),
+                quality=QualityAST(tags=["anime cinematic", "high detail"]),
+                negative=NegativeAST(tags=["low quality", "blurry", "distorted"])
             )
             
             entry = PromptManifestEntry(
