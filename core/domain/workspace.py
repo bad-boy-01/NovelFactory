@@ -13,6 +13,7 @@ class WorkspaceManager:
         self.cache_dir = self.base_dir / "cache"
         self.assets_dir = self.cache_dir / "assets"
         self.outputs_dir = self.base_dir / "outputs"
+        self.temp_dir = self.base_dir / "temp"
         
         self._initialize_directories()
 
@@ -22,12 +23,21 @@ class WorkspaceManager:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.assets_dir.mkdir(parents=True, exist_ok=True)
         self.outputs_dir.mkdir(parents=True, exist_ok=True)
+        self.temp_dir.mkdir(parents=True, exist_ok=True)
 
     def get_asset_dir(self, asset_hash: str) -> Path:
         """Returns the directory for a specific asset hash, creating it if needed."""
         target = self.assets_dir / asset_hash
         target.mkdir(parents=True, exist_ok=True)
         return target
+        
+    def get_db_path(self, db_name: str) -> str:
+        """Returns the path to a SQLite database in the cache directory."""
+        return str(self.cache_dir / db_name)
+        
+    def get_temp_path(self, filename: str) -> str:
+        """Returns a path inside the temp directory."""
+        return str(self.temp_dir / filename)
         
     def save_json(self, filename: str, data: Dict[str, Any]) -> None:
         """Saves a JSON file directly into the base workspace."""
@@ -43,6 +53,6 @@ class WorkspaceManager:
         with open(filepath, "r", encoding="utf-8") as f:
             return json.load(f)
             
-    def get_output_path(self, filename: str) -> Path:
+    def get_output_path(self, filename: str) -> str:
         """Returns a path inside the outputs directory."""
-        return self.outputs_dir / filename
+        return str(self.outputs_dir / filename)

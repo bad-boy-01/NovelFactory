@@ -1,14 +1,16 @@
 import sqlite3
 import json
 import logging
+import os
 from typing import List, Dict, Optional
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 class RenderQueue:
-    def __init__(self, db_path: str = "render_queue.db"):
+    def __init__(self, db_path: str = "workspace/cache/render_queue.db"):
         self.db_path = db_path
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self._init_db()
         
     def _init_db(self):

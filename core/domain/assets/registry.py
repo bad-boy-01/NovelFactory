@@ -34,6 +34,9 @@ class AssetRegistry(DomainModel):
     """
     Permanent, reproducible, tracked canonical assets.
     """
+    registry_version: int = 1
+    created_with_pipeline: str = "0.4.2"
+    created_at: str = ""
     assets: Dict[str, Asset] = {}
 
     def get_asset_status(self, asset_id: str, expected_prompt_hash: Optional[str] = None) -> AssetStatus:
@@ -49,7 +52,14 @@ class AssetRegistry(DomainModel):
         if expected_prompt_hash and asset.prompt_hash != expected_prompt_hash:
             return AssetStatus.STALE_METADATA
             
-        # Optional: implement checksum verification here if desired
+        if asset.checksum and asset.checksum != "dummy_checksum":
+            try:
+                with open(asset_path, "rb") as f:
+                    file_hash = hashlib.sha256(f.read()).hexdigest()
+                if file_hash != asset.checksum:
+                    return AssetStatus.CHECKSUM_MISMATCH
+            except Exception:
+                return AssetStatus.MISSING_FILE
         
         return AssetStatus.VALID
         

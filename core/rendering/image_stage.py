@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 class DiffusionRendererStage(PipelineStage):
     def __init__(self, diffusion_provider=None, render_options=None):
         self.diffusion = diffusion_provider
-        self.queue = RenderQueue()
         self.render_options = render_options or {}
 
     def get_providers(self) -> list:
@@ -60,9 +59,15 @@ class DiffusionRendererStage(PipelineStage):
         if not prompt_manifest:
             raise ValueError("DiffusionRenderer: Missing PromptManifest.")
             
+        queue = context.queue
+        registry = context.registry
+        workspace = context.workspace
+        from core.domain.assets.registry import AssetStatus, Asset
+        import hashlib
+        
         for p in prompt_manifest.prompts:
             if self._should_render(p):
-                self.queue.add_job(
+                queue.add_job(
                     job_id=p.prompt_id,
                     scene_id=p.scene_id,
                     shot_id=p.shot_id,
@@ -70,12 +75,8 @@ class DiffusionRendererStage(PipelineStage):
                     seed=p.seed
                 )
             
-        registry = context.registry
-        workspace = context.workspace
-        from core.domain.assets.registry import AssetStatus, Asset
-        
         # Self-healing Cache Validation
-        all_jobs = self.queue.get_all_jobs() if hasattr(self.queue, 'get_all_jobs') else []
+        all_jobs = queue.get_all_jobs() if hasattr(queue, 'get_all_jobs') else []
         for job in all_jobs:
             if job["status"] == "COMPLETE":
                 job_id = job["job_id"]
@@ -85,19 +86,19 @@ class DiffusionRendererStage(PipelineStage):
                 status = registry.get_asset_status(asset_id, expected_prompt_hash=job_id)
                 if status != AssetStatus.VALID:
                     logger.warning(f"[Self-Healing] Job {job_id} was COMPLETE but asset is {status.name}. Re-queueing.")
-                    self.queue.update_job_status(job_id, "PENDING")
+                    queue.update_job_status(job_id, "PENDING")
                     
-        pending_jobs = self.queue.get_pending_jobs(limit=100)
+        pending_jobs = queue.get_pending_jobs(limit=100)
         
         rendered_images = []
         
         for job in pending_jobs:
             job_id = job["job_id"]
-            self.queue.increment_attempts(job_id)
+            queue.increment_attempts(job_id)
             
             target_prompt = next((p for p in prompt_manifest.prompts if p.prompt_id == job_id), None)
             if not target_prompt:
-                self.queue.update_job_status(job_id, "FAILED")
+                queue.update_job_status(job_id, "FAILED")
                 continue
                 
             try:
@@ -158,13 +159,17 @@ class DiffusionRendererStage(PipelineStage):
                     with open(shot_dir / fname, "w", encoding="utf-8") as f:
                         json.dump({}, f)
                 
-                self.queue.update_job_status(job_id, "COMPLETE", image_path=output_path)
-                self.queue.log_event("DiffusionRenderer", f"Completed {job_id}")
+                queue.update_job_status(job_id, "COMPLETE", image_path=output_path)
+                queue.log_event("DiffusionRenderer", f"Completed {job_id}")
                 
+                # Checksum generation
+                with open(output_path, "rb") as f:
+                    file_hash = hashlib.sha256(f.read()).hexdigest()
+                    
                 asset = Asset(
                     asset_id=f"asset_{target_prompt.shot_id}",
                     type="image",
-                    checksum="dummy_checksum",
+                    checksum=file_hash,
                     prompt_hash=job_id,
                     seed=target_prompt.seed,
                     path=output_path
@@ -173,8 +178,8 @@ class DiffusionRendererStage(PipelineStage):
                 
             except Exception as e:
                 logger.error(f"Job {job_id} failed: {e}", exc_info=True)
-                self.queue.update_job_status(job_id, "FAILED")
-                self.queue.log_event("DiffusionRenderer", f"Failed {job_id}", details=str(e))
+                queue.update_job_status(job_id, "FAILED")
+                queue.log_event("DiffusionRenderer", f"Failed {job_id}", details=str(e))
                 
         # Generate Contact Sheet
         if rendered_images:

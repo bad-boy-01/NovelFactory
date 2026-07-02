@@ -93,15 +93,18 @@ def main():
     from core.domain.workspace import WorkspaceManager
     from core.domain.assets.registry import AssetRegistry
     from core.pipeline.compiler_context import CompilerContext
+    from core.rendering.render_queue import RenderQueue
     
     workspace = WorkspaceManager(base_dir="workspace")
     registry = AssetRegistry()
     registry.load(workspace)
+    queue = RenderQueue(db_path=workspace.get_db_path("render_queue.db"))
     
     compiler_context = CompilerContext(
         pipeline_context=context,
         workspace=workspace,
-        registry=registry
+        registry=registry,
+        queue=queue
     )
 
     # Import new stages
