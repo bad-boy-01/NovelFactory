@@ -43,8 +43,8 @@ class FFmpegAssemblyStage(PipelineStage):
             
         with open(concat_file, "w", encoding="utf-8") as f:
             for img in images:
-                # Use forward slashes for FFmpeg path compatibility
-                img_path = img.replace("\\", "/")
+                # Use absolute paths and forward slashes for FFmpeg path compatibility
+                img_path = os.path.abspath(img).replace("\\", "/")
                 f.write(f"file '{img_path}'\n")
                 f.write(f"duration 4.0\n") # Static duration for demo
                 
