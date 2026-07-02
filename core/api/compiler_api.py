@@ -59,6 +59,31 @@ class NovelFactoryAPI:
         logger.info(f"Inspecting {target_id}...")
         return {"id": target_id, "status": "valid", "type": "mock_report"}
         
+    def _write_environment_manifest(self):
+        """Records the exact environment details to reports/environment.json"""
+        import platform
+        reports_dir = self.workspace.base_dir / "reports"
+        reports_dir.mkdir(exist_ok=True)
+        env_data = {
+            "python": platform.python_version(),
+            "os": platform.system(),
+            # In a real environment, query torch/cuda/diffusers versions
+            "torch": "mock_version",
+            "cuda": "mock_version",
+            "diffusers": "mock_version"
+        }
+        with open(reports_dir / "environment.json", "w") as f:
+            import json
+            json.dump(env_data, f, indent=2)
+            
+    def _write_execution_log(self, stages: list):
+        """Records the execution pipeline timings to reports/execution.json"""
+        reports_dir = self.workspace.base_dir / "reports"
+        reports_dir.mkdir(exist_ok=True)
+        with open(reports_dir / "execution.json", "w") as f:
+            import json
+            json.dump({"stages": stages}, f, indent=2)
+
     def validate(self):
         """Validates the structural integrity of the workspace and asset registry."""
         logger.info("Validating workspace...")
