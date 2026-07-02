@@ -28,14 +28,20 @@ class WorkspaceManager:
         self.manifests_dir.mkdir(parents=True, exist_ok=True)
 
     def get_asset_dir(self, asset_hash: str) -> Path:
-        """Deprecated. Use get_versioned_asset_dir."""
+        """Deprecated. Use get_cas_dir."""
         target = self.assets_dir / asset_hash
         target.mkdir(parents=True, exist_ok=True)
         return target
         
     def get_versioned_asset_dir(self, shot_id: str, version: int) -> Path:
-        """Returns the versioned directory for a specific shot (e.g., assets/shot_001/v1)"""
+        """Deprecated. Use get_cas_dir."""
         target = self.assets_dir / shot_id / f"v{version}"
+        target.mkdir(parents=True, exist_ok=True)
+        return target
+
+    def get_cas_dir(self, content_hash: str) -> Path:
+        """Returns the Content Addressable Storage directory for a specific hash."""
+        target = self.assets_dir / content_hash
         target.mkdir(parents=True, exist_ok=True)
         return target
         

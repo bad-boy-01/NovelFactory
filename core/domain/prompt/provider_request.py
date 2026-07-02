@@ -1,35 +1,49 @@
 from pydantic import BaseModel, Field
-from typing import Dict, List, Optional, Literal
+from typing import Dict, List, Optional, Literal, Any
 from core.domain.base import DomainModel
+import datetime
 
-class ProviderRequest(DomainModel):
-    request_type: Literal["image", "video", "audio"] = "image"
-    backend: str = "diffusers"
-
-class ImageRequest(ProviderRequest):
-    request_type: Literal["image"] = "image"
-    positive_prompt: str = ""
-    negative_prompt: str = ""
-    width: int = 1024
-    height: int = 1024
+class GenerationParams(BaseModel):
+    resolution: tuple[int, int] = (1024, 1024)
+    seed: int = 0
     steps: int = 25
     cfg: float = 7.0
-    seed: int = 0
-    scheduler: str = "Euler a"
-    loras: List[str] = Field(default_factory=list)
-    controlnets: List[str] = Field(default_factory=list)
-    ip_adapters: List[str] = Field(default_factory=list)
-    metadata: Dict[str, str] = Field(default_factory=dict)
+    scheduler: str = "euler_a"
+    frames: Optional[int] = None # For video
+    fps: Optional[int] = None # For video
 
-class VideoRequest(ProviderRequest):
-    request_type: Literal["video"] = "video"
-    positive_prompt: str = ""
+class ConditioningParams(BaseModel):
+    prompt: str = ""
     negative_prompt: str = ""
-    frames: int = 49
-    fps: int = 24
-    width: int = 1024
-    height: int = 1024
-    steps: int = 50
-    cfg: float = 7.0
-    seed: int = 0
-    metadata: Dict[str, str] = Field(default_factory=dict)
+    controlnets: Dict[str, Any] = Field(default_factory=dict) # type -> image tensor/path
+    ip_adapter: Dict[str, Any] = Field(default_factory=dict) # character_id -> image tensor/path
+    reference_images: List[Any] = Field(default_factory=list)
+    masks: Dict[str, Any] = Field(default_factory=dict)
+
+class BindingParams(BaseModel):
+    loras: List[str] = Field(default_factory=list)
+    embeddings: List[str] = Field(default_factory=list)
+    style_models: List[str] = Field(default_factory=list)
+
+class PostProcessParams(BaseModel):
+    upscale: bool = False
+    restore_faces: bool = False
+    interpolation: bool = False
+
+class ProviderMetadata(BaseModel):
+    project_id: str = ""
+    scene_id: str = ""
+    shot_id: str = ""
+    render_id: str = ""
+    pipeline_version: str = "2.1"
+    provider_name: str = ""
+    created_at: str = Field(default_factory=lambda: datetime.datetime.now().isoformat())
+    fingerprint: str = ""
+
+class ProviderRequest(DomainModel):
+    request_type: Literal["image", "video"] = "image"
+    generation: GenerationParams = Field(default_factory=GenerationParams)
+    conditioning: ConditioningParams = Field(default_factory=ConditioningParams)
+    bindings: BindingParams = Field(default_factory=BindingParams)
+    postprocess: PostProcessParams = Field(default_factory=PostProcessParams)
+    metadata: ProviderMetadata = Field(default_factory=ProviderMetadata)
