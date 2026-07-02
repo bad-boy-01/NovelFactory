@@ -23,7 +23,11 @@ class LocalLLMProvider(LLMProvider):
         # In a real system, you might load config here too.
 
     def load(self):
-        print("[LLM] Loading model weights into VRAM...")
+        if self.model is not None:
+            print("[Resource] Reusing resident LLM.")
+            return
+            
+        print("[Resource] Loading LLM weights into VRAM...")
         if not self.tokenizer:
             self.initialize()
             
@@ -57,7 +61,7 @@ class LocalLLMProvider(LLMProvider):
 
     def unload(self):
         from core.utils.vram import flush_vram
-        print("[LLM] Unloading model weights...")
+        print("[Resource] Unloading LLM...")
         if self.model:
             del self.model
             self.model = None

@@ -129,25 +129,40 @@ def main():
         "render": render_stage
     }
 
+    planning_stages = [sb_stage, chunk_stage, scene_stage, shot_stage, camera_stage, prompt_stage, valid_stage, timeline_stage]
+    rendering_stages = [img_stage, render_stage]
+    
     if args.mode == "plan":
-        active_stages = [sb_stage, chunk_stage, scene_stage, shot_stage, camera_stage, prompt_stage, valid_stage, timeline_stage]
+        active_stages = planning_stages
     elif args.mode == "render":
-        active_stages = [img_stage, render_stage]
+        active_stages = rendering_stages
     elif args.mode == "all":
-        # Check if legacy --stage argument is used, else do all
         if args.stage != "all":
             active_stages = [stages_map[args.stage]]
         else:
-            active_stages = [sb_stage, chunk_stage, scene_stage, shot_stage, camera_stage, prompt_stage, valid_stage, timeline_stage, img_stage, render_stage]
+            active_stages = planning_stages + rendering_stages
 
     router = ContractRouter({})
-    executor = SequentialExecutor(stages=active_stages, contract_router=router, max_retries=2)
-
     from core.pipeline.resource_manager import ResourceSession
 
     try:
-        with ResourceSession(resources=[llm_provider, diffusion_provider]):
-            final_context = executor.run(context)
+        final_context = context
+        
+        if args.mode in ["plan", "all"] and args.stage == "all":
+            executor_plan = SequentialExecutor(stages=planning_stages, contract_router=router, max_retries=2)
+            with ResourceSession(resources=[llm_provider]):
+                final_context = executor_plan.run(final_context)
+                
+        if args.mode in ["render", "all"] and args.stage == "all":
+            executor_render = SequentialExecutor(stages=rendering_stages, contract_router=router, max_retries=2)
+            # Diffusion residency deferred to Phase 4.3
+            final_context = executor_render.run(final_context)
+            
+        if args.stage != "all":
+            executor_single = SequentialExecutor(stages=active_stages, contract_router=router, max_retries=2)
+            with ResourceSession(resources=[llm_provider]): # Best effort for single stage
+                final_context = executor_single.run(final_context)
+
         
         # Save intermediate artifacts
         for node in final_context.execution_nodes:

@@ -61,13 +61,17 @@ class SequentialExecutor:
                         raise e
 
             stage_duration = time.time() - stage_start_time
-            peak_vram = 0.0
-            alloc_vram = 0.0
+            peak_alloc = 0.0
+            peak_res = 0.0
+            cur_alloc = 0.0
+            cur_res = 0.0
             try:
                 import torch
                 if torch.cuda.is_available():
-                    peak_vram = torch.cuda.max_memory_allocated() / (1024**3)
-                    alloc_vram = torch.cuda.memory_allocated() / (1024**3)
+                    peak_alloc = torch.cuda.max_memory_allocated() / (1024**3)
+                    peak_res = torch.cuda.max_memory_reserved() / (1024**3)
+                    cur_alloc = torch.cuda.memory_allocated() / (1024**3)
+                    cur_res = torch.cuda.memory_reserved() / (1024**3)
             except ImportError:
                 pass
             
@@ -77,7 +81,8 @@ class SequentialExecutor:
             timeline_logs.append(
                 f"[{i+1}/{len(self.stages)}] {stage_name:<20} {stage_duration:.2f} s\n"
                 f"        Cache: {cache_str}\n"
-                f"        Peak VRAM: {peak_vram:.2f} GB | Alloc VRAM: {alloc_vram:.2f} GB\n"
+                f"        Alloc: {cur_alloc:.2f} GB (Peak: {peak_alloc:.2f} GB)\n"
+                f"        Reserv: {cur_res:.2f} GB (Peak: {peak_res:.2f} GB)\n"
                 f"        Contracts: PASS\n"
                 f"        Retry: {retries}"
             )
