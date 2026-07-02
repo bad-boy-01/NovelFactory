@@ -81,7 +81,7 @@ class FFmpegAssemblyStage(PipelineStage):
         # 3. Cleanup: Delete intermediate PNGs and VACUUM
         logger.info("Cleaning up intermediate assets...")
         for img in images:
-            os.remove(os.path.join(self.output_dir, img))
+            os.remove(img)
             
         RenderQueue().vacuum()
         logger.info("RenderQueue vacuumed.")
