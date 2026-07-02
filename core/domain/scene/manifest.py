@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import List, Optional
-from .base import DomainModel
+from core.domain.base import DomainModel
 
 class FrameInstruction(BaseModel):
     image_asset_id: Optional[str] = None

@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import Dict
-from .base import DomainModel
+from core.domain.base import DomainModel
 
 class CharacterReference(BaseModel):
     name: str

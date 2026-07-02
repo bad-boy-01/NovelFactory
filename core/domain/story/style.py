@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional
-from .base import DomainModel
+from core.domain.base import DomainModel
 
 class StyleGuide(DomainModel):
     visual_style: str = "Korean Manhwa"

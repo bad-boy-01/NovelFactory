@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict
 from pydantic import BaseModel
-from .base import DomainModel
+from core.domain.base import DomainModel
 
 class SceneDirectives(BaseModel):
     keep_same_outfit: bool = True
