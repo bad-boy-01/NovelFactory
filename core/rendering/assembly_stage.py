@@ -26,17 +26,23 @@ class FFmpegAssemblyStage(PipelineStage):
         if not timeline:
             raise ValueError("FFmpegAssembly: Missing Timeline.")
             
+        registry = context.registry
+        workspace = context.workspace
+        
         # Get count of video clips
         video_track = timeline.tracks.get("video_main")
         clip_count = len(video_track.clips) if video_track else 0
         logger.info(f"Assembling video from Timeline ({clip_count} items)...")
         
         # 1. Create concat file for FFmpeg
-        concat_file = os.path.join(self.output_dir, "concat.txt")
+        concat_file = workspace.get_output_path("concat.txt")
         
-        import glob
-        # Images are saved by ImageStage in workspace/Shot_XXX/image.png
-        images = sorted(glob.glob(os.path.join(self.output_dir, "Shot_*", "image.png")))
+        images = []
+        if video_track:
+            for clip in video_track.clips:
+                asset = registry.assets.get(clip.asset_id)
+                if asset and os.path.exists(asset.path):
+                    images.append(asset.path)
         
         if not images:
             raise ValueError("FFmpegAssembly: No rendered assets found.")
@@ -48,15 +54,15 @@ class FFmpegAssemblyStage(PipelineStage):
                 f.write(f"file '{img_path}'\n")
                 f.write(f"duration 4.0\n") # Static duration for demo
                 
-        output_video = os.path.join(self.output_dir, "final_video.mp4")
-        srt_file = os.path.join(self.output_dir, "subtitles.srt")
+        output_video = workspace.get_output_path("final_video.mp4")
+        srt_file = workspace.get_output_path("subtitles.srt")
         
         # 2. FFmpeg command: Subtitle multiplexing
         cmd = [
             "ffmpeg", "-y",
             "-f", "concat",
             "-safe", "0",
-            "-i", concat_file
+            "-i", str(concat_file)
         ]
         
         if os.path.exists(srt_file):
@@ -78,10 +84,8 @@ class FFmpegAssemblyStage(PipelineStage):
             logger.error(f"FFmpeg failed: {e.stderr.decode()}")
             raise e
             
-        # 3. Cleanup: Delete intermediate PNGs and VACUUM
-        logger.info("Cleaning up intermediate assets...")
-        for img in images:
-            os.remove(img)
+        # 3. Cleanup: Images are archived in AssetRegistry, do not delete them.
+        logger.info("Preserving intermediate assets in cache (Archive-based management).")
             
         RenderQueue().vacuum()
         logger.info("RenderQueue vacuumed.")

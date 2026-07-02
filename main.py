@@ -90,6 +90,20 @@ def main():
     diffusion_provider = LocalDiffusionProvider(config=diff_config)
     renderer_provider = FFmpegVideoRenderer()
 
+    from core.domain.workspace import WorkspaceManager
+    from core.domain.assets.registry import AssetRegistry
+    from core.pipeline.compiler_context import CompilerContext
+    
+    workspace = WorkspaceManager(base_dir="workspace")
+    registry = AssetRegistry()
+    registry.load(workspace)
+    
+    compiler_context = CompilerContext(
+        pipeline_context=context,
+        workspace=workspace,
+        registry=registry
+    )
+
     # Import new stages
     from core.planning.chunker import ChunkerStage
     from core.planning.scene_splitter import SceneSplitterStage
@@ -146,7 +160,7 @@ def main():
     from core.pipeline.resource_manager import ResourceSession
 
     try:
-        final_context = context
+        final_context = compiler_context
         
         if args.mode in ["plan", "all"] and args.stage == "all":
             executor_plan = SequentialExecutor(stages=planning_stages, contract_router=router, max_retries=2)
@@ -168,25 +182,21 @@ def main():
         for node in final_context.execution_nodes:
             art = node.artifact
             name = type(art).__name__
-            if name == "StoryBible":
-                save_workspace("StoryBible.json", art.model_dump_json(indent=2))
-            elif name == "SceneManifest":
-                save_workspace("SceneManifest.json", art.model_dump_json(indent=2))
-            elif name == "ShotManifest":
-                save_workspace("ShotManifest.json", art.model_dump_json(indent=2))
-            elif name == "PromptManifest":
-                save_workspace("PromptManifest.json", art.model_dump_json(indent=2))
-            elif name == "Timeline":
-                save_workspace("Timeline.json", art.model_dump_json(indent=2))
+            if name in ["StoryBible", "SceneManifest", "ShotManifest", "PromptManifest", "Timeline"]:
+                workspace.save_json(f"{name}.json", json.loads(art.model_dump_json()))
+                
+        # Save updated registry
+        registry.save(workspace)
                 
         if args.mode in ["plan", "all"]:
             from core.reporting.reporter import CompilerReporter
             reporter = CompilerReporter()
-            report_data = reporter.generate_compile_report(final_context)
-            save_workspace("compile_report.json", json.dumps(report_data, indent=2))
+            report_data = reporter.generate_compile_report(final_context.pipeline)
+            workspace.save_json("compile_report.json", report_data)
             
-            director_report = reporter.generate_directors_report(final_context)
-            save_workspace("directors_report.txt", director_report)
+            director_report = reporter.generate_directors_report(final_context.pipeline)
+            with open(workspace.get_output_path("director_report.txt"), "w", encoding="utf-8") as f:
+                f.write(director_report)
             print("\n" + director_report)
         
         # Copy workspace to debug

@@ -70,10 +70,25 @@ class DiffusionRendererStage(PipelineStage):
                     seed=p.seed
                 )
             
-        registry = AssetRegistry(schema_version="1.0")
+        registry = context.registry
+        workspace = context.workspace
+        from core.domain.assets.registry import AssetStatus, Asset
+        
+        # Self-healing Cache Validation
+        all_jobs = self.queue.get_all_jobs() if hasattr(self.queue, 'get_all_jobs') else []
+        for job in all_jobs:
+            if job["status"] == "COMPLETE":
+                job_id = job["job_id"]
+                shot_id = job["shot_id"]
+                asset_id = f"asset_{shot_id}"
+                
+                status = registry.get_asset_status(asset_id, expected_prompt_hash=job_id)
+                if status != AssetStatus.VALID:
+                    logger.warning(f"[Self-Healing] Job {job_id} was COMPLETE but asset is {status.name}. Re-queueing.")
+                    self.queue.update_job_status(job_id, "PENDING")
+                    
         pending_jobs = self.queue.get_pending_jobs(limit=100)
         
-        os.makedirs("workspace", exist_ok=True)
         rendered_images = []
         
         for job in pending_jobs:
@@ -108,22 +123,21 @@ class DiffusionRendererStage(PipelineStage):
                 )
                 render_time = time.time() - start_time
                 
-                shot_dir = f"workspace/Shot_{target_prompt.shot_id}"
-                os.makedirs(shot_dir, exist_ok=True)
+                shot_dir = workspace.get_asset_dir(job_id)
                 
-                output_path = f"{shot_dir}/image.png"
+                output_path = str(shot_dir / "image.png")
                 image.save(output_path)
                 rendered_images.append(output_path)
                 
                 # Write metadata and related files
-                with open(f"{shot_dir}/prompt.txt", "w", encoding="utf-8") as f:
+                with open(shot_dir / "prompt.txt", "w", encoding="utf-8") as f:
                     f.write(str(ast.model_dump()))
-                with open(f"{shot_dir}/optimized_prompt.txt", "w", encoding="utf-8") as f:
+                with open(shot_dir / "optimized_prompt.txt", "w", encoding="utf-8") as f:
                     f.write(prompt_str)
-                with open(f"{shot_dir}/negative.txt", "w", encoding="utf-8") as f:
+                with open(shot_dir / "negative.txt", "w", encoding="utf-8") as f:
                     f.write(negative_str)
                     
-                with open(f"{shot_dir}/metadata.json", "w", encoding="utf-8") as f:
+                with open(shot_dir / "metadata.json", "w", encoding="utf-8") as f:
                     json.dump({
                         "scene_id": target_prompt.scene_id,
                         "shot_id": target_prompt.shot_id,
@@ -141,7 +155,7 @@ class DiffusionRendererStage(PipelineStage):
                     
                 # Mock manifests for reproducibility
                 for fname in ["scene.json", "shot.json", "camera.json", "continuity.json", "qa.json", "duration.json"]:
-                    with open(f"{shot_dir}/{fname}", "w", encoding="utf-8") as f:
+                    with open(shot_dir / fname, "w", encoding="utf-8") as f:
                         json.dump({}, f)
                 
                 self.queue.update_job_status(job_id, "COMPLETE", image_path=output_path)

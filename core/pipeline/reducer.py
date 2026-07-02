@@ -8,7 +8,12 @@ class ContextReducer:
     and returns a brand new PipelineContext (Context N+1) preserving identity through Pydantic model_copy.
     Does not run validations or retries.
     """
-    def reduce(self, context: PipelineContext, result: StageResult) -> PipelineContext:
+    def reduce(self, context, result: StageResult):
+        from core.pipeline.compiler_context import CompilerContext
+        
+        is_compiler_context = isinstance(context, CompilerContext)
+        pipeline_context = context.pipeline if is_compiler_context else context
+        
         updates = {}
         
         # Merge StoryBible
@@ -17,11 +22,15 @@ class ContextReducer:
             
         # Merge ExecutionNode (The true canonical runtime output)
         if hasattr(result, 'execution_node') and result.execution_node:
-            updates['execution_nodes'] = context.execution_nodes + [result.execution_node]
+            updates['execution_nodes'] = pipeline_context.execution_nodes + [result.execution_node]
             
         # Store other outputs in ephemeral state
-        new_state = dict(context.state)
+        new_state = dict(pipeline_context.state)
         new_state[str(type(result.artifact).__name__)] = result.artifact
         updates['state'] = new_state
-            
-        return context.model_copy(update=updates)
+        
+        new_pipeline = pipeline_context.model_copy(update=updates)
+        
+        if is_compiler_context:
+            return CompilerContext(new_pipeline, context.workspace, context.registry, context.queue)
+        return new_pipeline

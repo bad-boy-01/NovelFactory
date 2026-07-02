@@ -66,6 +66,12 @@ class RenderQueue:
                 WHERE job_id = ?
             """, (datetime.utcnow(), job_id))
             
+    def get_all_jobs(self) -> List[Dict]:
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("SELECT * FROM render_jobs")
+            return [dict(row) for row in cursor.fetchall()]
+
     def get_pending_jobs(self, limit: int = 10) -> List[Dict]:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
