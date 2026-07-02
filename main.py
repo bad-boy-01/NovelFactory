@@ -172,8 +172,8 @@ def main():
                 
         if args.mode in ["render", "all"] and args.stage == "all":
             executor_render = SequentialExecutor(stages=rendering_stages, contract_router=router, max_retries=2)
-            # Diffusion residency deferred to Phase 4.3
-            final_context = executor_render.run(final_context)
+            with ResourceSession(resources=[diffusion_provider]):
+                final_context = executor_render.run(final_context)
             
         if args.stage != "all":
             executor_single = SequentialExecutor(stages=active_stages, contract_router=router, max_retries=2)

@@ -112,17 +112,35 @@ class DiffusionRendererStage(PipelineStage):
                 
                 prompt_str = f"{ast.subject.description}, {ast.environment.location}, {ast.camera.distance} {ast.camera.angle}, {ast.lighting.style}, {ast.composition.style}, {style_tags}"
                 
+                from core.domain.rendering.presets import RenderJob, RenderPreset
+                from diffusers import EulerDiscreteScheduler
+                preset = RenderPreset(
+                    width=1024,
+                    height=1024,
+                    steps=ast.technical.steps,
+                    cfg=0.0, # ByteDance Lightning recommends 0 CFG
+                    scheduler_class=EulerDiscreteScheduler,
+                    negative_prompt=negative_str
+                )
+                
+                render_job = RenderJob(
+                    prompt=prompt_str,
+                    negative_prompt=negative_str,
+                    seed=target_prompt.seed,
+                    preset=preset
+                )
+                
                 # Render using the provider
                 import time
                 start_time = time.time()
-                image = self.diffusion.generate_image(
-                    prompt=prompt_str,
-                    negative_prompt=negative_str,
-                    num_inference_steps=ast.technical.steps,
-                    guidance_scale=ast.technical.cfg,
-                    seed=target_prompt.seed
-                )
+                image = self.diffusion.generate(job=render_job)
                 render_time = time.time() - start_time
+                
+                # Benchmark logging
+                health = self.diffusion.health_check() if hasattr(self.diffusion, "health_check") else None
+                vram_gb = health.vram_allocated_gb if health else 0.0
+                logger.info(f"BENCHMARK: Shot {target_prompt.shot_id} | {preset.width}x{preset.height} | {preset.steps} steps | {render_time:.2f} s | {vram_gb:.2f} GB")
+                
                 
                 shot_dir = workspace.get_asset_dir(job_id)
                 
