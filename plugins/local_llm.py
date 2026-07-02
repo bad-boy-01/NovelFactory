@@ -122,20 +122,53 @@ JSON OUTPUT:
     def _extract_json(self, text: str) -> str:
         """
         Robustly extract the first syntactically complete JSON object from
-        LLM output. Uses json.JSONDecoder.raw_decode so it stops exactly at
-        the end of the first valid object and ignores any trailing text,
-        avoiding the 'Extra data' JSONDecodeError caused by the greedy regex.
+        LLM output.
+
+        Strategy:
+          1. Try raw_decode on each '{' for strict JSON.
+          2. If nothing parses, attempt _repair_json to fix common LLM
+             mistakes (unquoted keys, single-quoted strings) then retry.
+          3. Raise ValueError with the first 200 chars for debugging.
         """
         decoder = json.JSONDecoder()
-        for i, ch in enumerate(text):
-            if ch == '{':
-                try:
-                    obj, _ = decoder.raw_decode(text, i)
-                    return json.dumps(obj)   # re-serialise for a clean string
-                except json.JSONDecodeError:
-                    continue  # that '{' wasn't the start of a valid object
+
+        def _try_decode(s: str):
+            for i, ch in enumerate(s):
+                if ch == '{':
+                    try:
+                        obj, _ = decoder.raw_decode(s, i)
+                        return json.dumps(obj)
+                    except json.JSONDecodeError:
+                        continue
+            return None
+
+        # Pass 1 — strict JSON
+        result = _try_decode(text)
+        if result:
+            return result
+
+        # Pass 2 — repaired JSON (handles JS-style unquoted keys, single quotes)
+        repaired = self._repair_json(text)
+        result = _try_decode(repaired)
+        if result:
+            print(f"[LLM] JSON repaired (unquoted keys or single quotes fixed)", flush=True)
+            return result
 
         raise ValueError(
             f"No valid JSON object found in LLM output. "
             f"First 200 chars: {text[:200]!r}"
         )
+
+    def _repair_json(self, text: str) -> str:
+        """
+        Best-effort fix for common LLM JSON mistakes:
+        - Unquoted object keys:  { key: value }  →  { "key": value }
+        - Single-quoted strings: { 'k': 'v' }   →  { "k": "v" }
+        """
+        # Quote unquoted keys: word characters followed by colon,
+        # not already preceded by a quote or another word char.
+        repaired = re.sub(r'(?<!["\w])([a-zA-Z_]\w*)\s*:', r'"\1":', text)
+        # Replace single-quoted string values/keys with double quotes
+        repaired = re.sub(r"'([^']*)'", r'"\1"', repaired)
+        return repaired
+

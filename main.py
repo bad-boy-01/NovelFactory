@@ -2,21 +2,8 @@ import argparse
 import logging
 import json
 import sys
-import os
 from pathlib import Path
 import shutil
-
-# ── Kaggle: cache HF models to /kaggle/working so they survive between restarts
-# Must be set BEFORE any huggingface_hub / transformers imports.
-_hf_cache = os.environ.get("HF_HOME", "/kaggle/working/.hf_cache")
-os.environ.setdefault("HF_HOME", _hf_cache)
-os.makedirs(_hf_cache, exist_ok=True)
-
-# Silence the HTTP request spam from huggingface_hub
-os.environ.setdefault("HF_HUB_VERBOSITY", "error")
-logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
-logging.getLogger("huggingface_hub.utils._http").setLevel(logging.ERROR)
-logging.getLogger("huggingface_hub.file_download").setLevel(logging.ERROR)
 
 # Force unbuffered output so every print/log line appears immediately in Kaggle
 sys.stdout.reconfigure(line_buffering=True)
