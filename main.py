@@ -30,6 +30,10 @@ def main():
     parser = argparse.ArgumentParser(description="NovelFactory Milestone 1 Validator")
     parser.add_argument("--novel", type=str, default="sample.txt", help="Path to novel text")
     parser.add_argument("--stage", type=str, default="all", help="Stage to run: story_bible, prompt, diffusion, render, all, validate")
+    parser.add_argument("--mode", type=str, default="all", choices=["plan", "render", "all"], help="Execution mode: plan, render, all")
+    parser.add_argument("--render-shot", type=str, help="Specific shot to render, e.g., '31'")
+    parser.add_argument("--render-scene", type=str, help="Specific scene to render, e.g., '4'")
+    parser.add_argument("--render-shots", type=str, help="Range of shots to render, e.g., '20-28'")
     args = parser.parse_args()
 
     if args.stage == "validate":
@@ -94,7 +98,12 @@ def main():
     prompt_stage = PromptBuilderStage()
     valid_stage = ValidatorStage()
     timeline_stage = TimelineBuilderStage()
-    img_stage = DiffusionRendererStage(diffusion_provider=diffusion_provider)
+    render_options = {
+        "shot": args.render_shot,
+        "scene": args.render_scene,
+        "shots": args.render_shots
+    }
+    img_stage = DiffusionRendererStage(diffusion_provider=diffusion_provider, render_options=render_options)
     render_stage = FFmpegAssemblyStage()
 
     stages_map = {
@@ -109,10 +118,16 @@ def main():
         "render": render_stage
     }
 
-    if args.stage == "all":
-        active_stages = list(stages_map.values())
-    else:
-        active_stages = [stages_map[args.stage]]
+    if args.mode == "plan":
+        active_stages = [sb_stage, scene_stage, shot_stage, camera_stage, prompt_stage, valid_stage, timeline_stage]
+    elif args.mode == "render":
+        active_stages = [img_stage, render_stage]
+    elif args.mode == "all":
+        # Check if legacy --stage argument is used, else do all
+        if args.stage != "all":
+            active_stages = [stages_map[args.stage]]
+        else:
+            active_stages = [sb_stage, scene_stage, shot_stage, camera_stage, prompt_stage, valid_stage, timeline_stage, img_stage, render_stage]
 
     router = ContractRouter({})
     executor = SequentialExecutor(stages=active_stages, contract_router=router, max_retries=2)
@@ -121,8 +136,29 @@ def main():
         final_context = executor.run(context)
         
         # Save intermediate artifacts
-        if final_context.story_bible:
-            save_workspace("001_story_bible.json", final_context.story_bible.model_dump_json(indent=2))
+        for node in final_context.execution_nodes.values():
+            art = node.artifact
+            name = type(art).__name__
+            if name == "StoryBible":
+                save_workspace("StoryBible.json", art.model_dump_json(indent=2))
+            elif name == "SceneManifest":
+                save_workspace("SceneManifest.json", art.model_dump_json(indent=2))
+            elif name == "ShotManifest":
+                save_workspace("ShotManifest.json", art.model_dump_json(indent=2))
+            elif name == "PromptManifest":
+                save_workspace("PromptManifest.json", art.model_dump_json(indent=2))
+            elif name == "Timeline":
+                save_workspace("Timeline.json", art.model_dump_json(indent=2))
+                
+        if args.mode in ["plan", "all"]:
+            from core.reporting.reporter import CompilerReporter
+            reporter = CompilerReporter()
+            report_data = reporter.generate_compile_report(final_context)
+            save_workspace("compile_report.json", json.dumps(report_data, indent=2))
+            
+            director_report = reporter.generate_directors_report(final_context)
+            save_workspace("directors_report.txt", director_report)
+            print("\n" + director_report)
         
         # Copy workspace to debug
         shutil.copytree("workspace", "debug/workspace_run", dirs_exist_ok=True)
