@@ -104,10 +104,15 @@ OUTPUT:
             **inputs,
             max_new_tokens=512,
             temperature=0.3,
-            top_p=0.9
+            top_p=0.9,
+            do_sample=True,
         )
 
-        decoded = self.tokenizer.decode(output[0], skip_special_tokens=True)
+        # Decode ONLY the newly generated tokens (strip the echoed input prompt)
+        input_length = inputs.input_ids.shape[1]
+        new_tokens = output[0][input_length:]
+        decoded = self.tokenizer.decode(new_tokens, skip_special_tokens=True)
+        print(f"[LLM] Raw output ({len(decoded)} chars): {decoded[:120]!r}")
 
         json_text = self._extract_json(decoded)
 
@@ -116,11 +121,23 @@ OUTPUT:
     # -------------------------
     # SAFE JSON EXTRACTION
     # -------------------------
-    def _extract_json(self, text: str):
+    def _extract_json(self, text: str) -> str:
+        """
+        Robustly extract the first syntactically complete JSON object from
+        LLM output. Uses json.JSONDecoder.raw_decode so it stops exactly at
+        the end of the first valid object and ignores any trailing text,
+        avoiding the 'Extra data' JSONDecodeError caused by the greedy regex.
+        """
+        decoder = json.JSONDecoder()
+        for i, ch in enumerate(text):
+            if ch == '{':
+                try:
+                    obj, _ = decoder.raw_decode(text, i)
+                    return json.dumps(obj)   # re-serialise for a clean string
+                except json.JSONDecodeError:
+                    continue  # that '{' wasn't the start of a valid object
 
-        match = re.search(r"\{.*\}", text, re.DOTALL)
-
-        if not match:
-            raise ValueError("No JSON found in LLM output")
-
-        return match.group(0)
+        raise ValueError(
+            f"No valid JSON object found in LLM output. "
+            f"First 200 chars: {text[:200]!r}"
+        )
