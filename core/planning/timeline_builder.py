@@ -91,8 +91,8 @@ class TimelineBuilderStage(PipelineStage):
         
         timeline = Timeline(
             checksum=checksum,
-            generated_from_prompt_manifest_hash=getattr(prompt_manifest, "source_hash", ""),
-            generated_from_scene_manifest_hash=getattr(scene_manifest, "source_hash", ""),
+            generated_from_prompt_manifest_hash=getattr(prompt_manifest, "source_hash", "") or "",
+            generated_from_scene_manifest_hash=getattr(scene_manifest, "source_hash", "") or "",
             tracks={
                 "video_main": video_track,
                 "subtitles": subtitle_track,
