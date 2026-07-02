@@ -58,13 +58,8 @@ class CompilerReporter:
         
         if bible:
             lines.append("Characters:")
-            for char in bible.characters:
-                lines.append(f"? {char.name}")
-            lines.append("")
-            
-            lines.append("Locations:")
-            for loc in bible.locations:
-                lines.append(f"? {loc.name}")
+            for char in bible.characters.values():
+                lines.append(f"- {char.name}")
             lines.append("")
             
         lines.append("Warnings:")
