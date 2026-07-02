@@ -1,25 +1,10 @@
 import argparse
-import logging
-import json
 import sys
-from pathlib import Path
-import shutil
+import logging
+from core.api.compiler_api import NovelFactoryAPI
 
 # Force unbuffered output so every print/log line appears immediately in Kaggle
 sys.stdout.reconfigure(line_buffering=True)
-
-from core.pipeline.context import PipelineContext
-from core.domain.story.project import ProjectManifest, ProjectMetadata
-from plugins.local_llm import LocalLLMProvider
-from core.planning.story_bible_stage import StoryBibleGeneratorStage
-from plugins.local_diffusion import LocalDiffusionProvider
-from plugins.interfaces import DiffusionConfig
-from core.pipeline.cache import CacheProvider
-from core.optimization.prompt_builder import PromptBuilderStage
-from plugins.ffmpeg_renderer import FFmpegVideoRenderer
-from core.rendering.assembly_stage import FFmpegAssemblyStage
-from core.rendering.executor import SequentialExecutor
-from core.contracts.router import ContractRouter
 
 logging.basicConfig(
     level=logging.INFO,
@@ -29,211 +14,164 @@ logging.basicConfig(
 )
 logger = logging.getLogger("NovelFactory")
 
-def save_workspace(name: str, content: str):
-    Path("workspace").mkdir(exist_ok=True)
-    with open(f"workspace/{name}", "w", encoding="utf-8") as f:
-        f.write(content)
+def handle_compile(api: NovelFactoryAPI, args: argparse.Namespace):
+    if args.model:
+        api.use_model(args.model)
+    # Could handle args.preset, args.seed, etc. here
+    api.compile(target=args.target, resume=args.resume)
+
+def handle_status(api: NovelFactoryAPI, args: argparse.Namespace):
+    status_data = api.status()
+    print("="*50)
+    print("PROJECT STATUS")
+    print("="*50)
+    for k, v in status_data.items():
+        if isinstance(v, dict):
+            print(f"{k.capitalize()}:")
+            for sub_k, sub_v in v.items():
+                print(f"  {sub_k.capitalize()}: {sub_v}")
+        else:
+            print(f"{k.capitalize().replace('_', ' ')}: {v}")
+
+def handle_doctor(api: NovelFactoryAPI, args: argparse.Namespace):
+    report = api.doctor().model_dump()
+    print("="*50)
+    print("NOVELFACTORY DOCTOR")
+    print("="*50)
+    for k, v in report.items():
+        if isinstance(v, dict):
+            print(f"{k}:")
+            for sub_k, sub_v in v.items():
+                print(f"  {sub_k}: {sub_v}")
+        else:
+            print(f"{k}: {v}")
+
+def handle_explain(api: NovelFactoryAPI, args: argparse.Namespace):
+    report = api.explain(args.target)
+    print("="*50)
+    print(f"PROVENANCE: {args.target}")
+    print("="*50)
+    for step in report["trace"]:
+        print(f"↓ {step}")
+
+def handle_benchmark(api: NovelFactoryAPI, args: argparse.Namespace):
+    report = api.benchmark().model_dump()
+    import json
+    print(json.dumps(report, indent=2))
+
+def handle_logs(api: NovelFactoryAPI, args: argparse.Namespace):
+    print(f"Fetching logs for {args.type}...")
+    # Read from reports/
+
+def handle_project(api: NovelFactoryAPI, args: argparse.Namespace):
+    api.project_action(args.action)
+
+def handle_workspace(api: NovelFactoryAPI, args: argparse.Namespace):
+    api.workspace_action(args.action)
+
+def handle_inspect(api: NovelFactoryAPI, args: argparse.Namespace):
+    print(api.inspect(args.target))
+
+def handle_graph(api: NovelFactoryAPI, args: argparse.Namespace):
+    api.graph(args.view)
+
+def handle_cache(api: NovelFactoryAPI, args: argparse.Namespace):
+    api.cache_action(args.action)
+
+def handle_assets(api: NovelFactoryAPI, args: argparse.Namespace):
+    api.assets_action(args.action)
+
+def handle_models(api: NovelFactoryAPI, args: argparse.Namespace):
+    api.models_action(args.action)
+
+def handle_export(api: NovelFactoryAPI, args: argparse.Namespace):
+    api.export(args.format)
 
 def main():
-    parser = argparse.ArgumentParser(description="NovelFactory Milestone 1 Validator")
-    parser.add_argument("--novel", type=str, default="sample.txt", help="Path to novel text")
-    parser.add_argument("--stage", type=str, default="all", help="Stage to run: story_bible, prompt, diffusion, render, all, validate")
-    parser.add_argument("--mode", type=str, default="all", choices=["plan", "render", "all"], help="Execution mode: plan, render, all")
-    parser.add_argument("--render-shot", type=str, help="Specific shot to render, e.g., '31'")
-    parser.add_argument("--render-scene", type=str, help="Specific scene to render, e.g., '4'")
-    parser.add_argument("--render-shots", type=str, help="Range of shots to render, e.g., '20-28'")
-    parser.add_argument("--inspect", type=str, help="Inspect a compiled manifest by name or path (e.g., 'story_bible' or 'workspace/manifests/story_bible.json')")
+    parser = argparse.ArgumentParser(description="NovelFactory Digital Film Compiler")
+    parser.add_argument("--project", type=str, default="workspace", help="Path to project directory")
+    
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    
+    # compile
+    compile_parser = subparsers.add_parser("compile", help="Compile the project")
+    compile_parser.add_argument("target", choices=["plan", "render", "assemble", "all"], help="Target stage to compile")
+    compile_parser.add_argument("--resume", action="store_true", help="Resume from last interrupted state")
+    compile_parser.add_argument("--model", type=str, help="Provider model to use (e.g. sdxl-lightning)")
+    compile_parser.add_argument("--preset", type=str, help="Render preset to use")
+    compile_parser.add_argument("--seed", type=int, help="Global random seed")
+    compile_parser.add_argument("--jobs", type=int, help="Number of parallel jobs")
+    compile_parser.set_defaults(func=handle_compile)
+
+    # status
+    status_parser = subparsers.add_parser("status", help="Show project dashboard")
+    status_parser.set_defaults(func=handle_status)
+
+    # doctor
+    doctor_parser = subparsers.add_parser("doctor", help="Run Kaggle environment diagnostics")
+    doctor_parser.set_defaults(func=handle_doctor)
+
+    # explain
+    explain_parser = subparsers.add_parser("explain", help="Show provenance of an asset/manifest")
+    explain_parser.add_argument("target", type=str, help="ID of the asset or manifest")
+    explain_parser.set_defaults(func=handle_explain)
+    
+    # benchmark
+    benchmark_parser = subparsers.add_parser("benchmark", help="Show comprehensive compiler performance metrics")
+    benchmark_parser.set_defaults(func=handle_benchmark)
+
+    # logs
+    logs_parser = subparsers.add_parser("logs", help="Access reports and logs")
+    logs_parser.add_argument("type", choices=["latest", "benchmark", "doctor", "validation"], help="Log type to view")
+    logs_parser.set_defaults(func=handle_logs)
+
+    # project
+    project_parser = subparsers.add_parser("project", help="Project management")
+    project_parser.add_argument("action", choices=["init", "open", "info", "clean", "archive", "clone", "list"], help="Action")
+    project_parser.set_defaults(func=handle_project)
+    
+    # workspace
+    workspace_parser = subparsers.add_parser("workspace", help="Workspace health and folder operations")
+    workspace_parser.add_argument("action", choices=["info", "verify", "clean", "repair"], help="Action")
+    workspace_parser.set_defaults(func=handle_workspace)
+
+    # inspect
+    inspect_parser = subparsers.add_parser("inspect", help="Universal object inspector")
+    inspect_parser.add_argument("target", type=str, help="Target ID (e.g., shot_018, asset:123)")
+    inspect_parser.set_defaults(func=handle_inspect)
+    
+    # graph
+    graph_parser = subparsers.add_parser("graph", help="Generate DOT graph visualizations")
+    graph_parser.add_argument("view", choices=["pipeline", "scene", "render", "assets", "state", "dependencies"], help="Graph view")
+    graph_parser.set_defaults(func=handle_graph)
+    
+    # cache
+    cache_parser = subparsers.add_parser("cache", help="Manage caches")
+    cache_parser.add_argument("action", choices=["stats", "verify", "clean", "repair"], help="Action")
+    cache_parser.set_defaults(func=handle_cache)
+    
+    # assets
+    assets_parser = subparsers.add_parser("assets", help="Manage CAS assets")
+    assets_parser.add_argument("action", choices=["list", "verify", "orphaned", "export", "lineage"], help="Action")
+    assets_parser.set_defaults(func=handle_assets)
+    
+    # models
+    models_parser = subparsers.add_parser("models", help="Manage provider models")
+    models_parser.add_argument("action", choices=["list", "info", "download", "verify", "cache", "remove", "benchmark"], help="Action")
+    models_parser.set_defaults(func=handle_models)
+    
+    # export
+    export_parser = subparsers.add_parser("export", help="Export artifacts")
+    export_parser.add_argument("format", choices=["video", "images", "project", "report", "manifests"], help="Format to export")
+    export_parser.set_defaults(func=handle_export)
+
     args = parser.parse_args()
-
-    if args.inspect:
-        target = args.inspect
-        if not target.endswith(".json"):
-            target = f"workspace/manifests/{target}.json"
-        
-        path = Path(target)
-        if not path.exists():
-            logger.error(f"[ERROR] Artifact not found at {path}")
-            sys.exit(1)
-            
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            
-        metadata = data.get("metadata", {})
-        print("="*50)
-        print(f"MANIFEST INSPECTOR: {path.name}")
-        print("="*50)
-        for k, v in metadata.items():
-            print(f"{k:<25} : {v}")
-        print("="*50)
-        sys.exit(0)
-
-    if args.stage == "validate":
-        logger.info("[VALIDATE] Running architectural sanity check...")
-        manifest = ProjectManifest(metadata=ProjectMetadata(project_name="Sanity", dataset_id="test"), source_text="test")
-        context = PipelineContext(project_manifest=manifest)
-        llm = LocalLLMProvider()
-        cache = CacheProvider(".cache")
-        diff = LocalDiffusionProvider(DiffusionConfig(cpu_offload=True))
-        rend = FFmpegVideoRenderer()
-        from core.rendering.image_stage import DiffusionRendererStage
-        stages = [StoryBibleGeneratorStage(llm), PromptBuilderStage(), DiffusionRendererStage(diffusion_provider=diff), FFmpegAssemblyStage()]
-        router = ContractRouter({})
-        from core.pipeline.reducer import ContextReducer
-        from core.pipeline.stage import StageResult
-        reducer = ContextReducer()
-        from core.domain.assets.execution import ExecutionNode
-        dummy_result = StageResult(artifact="dummy", execution_node=ExecutionNode(artifact="dummy", stage_name="validate"), metrics={}, metadata={})
-        new_ctx = reducer.reduce(context, dummy_result)
-        assert new_ctx is not context, "Reducer mutated context instead of copying!"
-        logger.info("[SUCCESS] Sanity validation passed. All architecture components wired correctly.")
-        return
-
-    Path("workspace").mkdir(exist_ok=True)
-    Path("debug").mkdir(exist_ok=True)
-
-    novel_path = Path(args.novel)
-    if not novel_path.exists():
-        with open(args.novel, "w") as f:
-            f.write("Alice stood in the dark forest, her blue dress illuminated by moonlight.")
-
-    if novel_path.suffix == '.docx':
-        import docx
-        doc = docx.Document(args.novel)
-        novel_text = "\\n".join([para.text for para in doc.paragraphs])
+    
+    api = NovelFactoryAPI(project_dir=args.project)
+    if hasattr(args, "func"):
+        args.func(api, args)
     else:
-        with open(args.novel, "r", encoding="utf-8") as f:
-            novel_text = f.read()
-
-    manifest = ProjectManifest(metadata=ProjectMetadata(project_name="Milestone1", dataset_id="local_run"), source_text=novel_text)
-    context = PipelineContext(project_manifest=manifest)
-
-    llm_provider = LocalLLMProvider() 
-    cache_provider = CacheProvider(cache_dir=".cache/generation")
-    diff_config = DiffusionConfig(cpu_offload=True) 
-    diffusion_provider = LocalDiffusionProvider(config=diff_config)
-    renderer_provider = FFmpegVideoRenderer()
-
-    from core.domain.workspace import WorkspaceManager
-    from core.domain.assets.registry import AssetRegistry
-    from core.pipeline.compiler_context import CompilerContext
-    from core.rendering.render_queue import RenderQueue
-    
-    workspace = WorkspaceManager(base_dir="workspace")
-    registry = AssetRegistry()
-    registry.load(workspace)
-    queue = RenderQueue(db_path=workspace.get_db_path("render_queue.db"))
-    
-    compiler_context = CompilerContext(
-        pipeline_context=context,
-        workspace=workspace,
-        registry=registry,
-        queue=queue
-    )
-
-    # Import new stages
-    from core.planning.chunker import ChunkerStage
-    from core.planning.scene_splitter import SceneSplitterStage
-    from core.planning.shot_planner import ShotPlannerStage
-    from core.planning.camera_planner import CameraPlannerStage
-    from core.validation.pipeline_validator import ValidatorStage
-    from core.planning.timeline_builder import TimelineBuilderStage
-    from core.rendering.image_stage import DiffusionRendererStage
-    from core.rendering.assembly_stage import FFmpegAssemblyStage
-
-    # Stages need to expose get_providers for Executor lifecycle management
-    sb_stage = StoryBibleGeneratorStage(llm_provider)
-    chunk_stage = ChunkerStage(chunk_size=2000, overlap=200)
-    scene_stage = SceneSplitterStage(llm_provider)
-    shot_stage = ShotPlannerStage(llm_provider)
-    camera_stage = CameraPlannerStage()
-    prompt_stage = PromptBuilderStage()
-    valid_stage = ValidatorStage()
-    timeline_stage = TimelineBuilderStage()
-    render_options = {
-        "shot": args.render_shot,
-        "scene": args.render_scene,
-        "shots": args.render_shots
-    }
-    img_stage = DiffusionRendererStage(diffusion_provider=diffusion_provider, render_options=render_options)
-    render_stage = FFmpegAssemblyStage()
-
-    stages_map = {
-        "story_bible": sb_stage,
-        "scene": scene_stage,
-        "shot": shot_stage,
-        "camera": camera_stage,
-        "prompt": prompt_stage,
-        "validate": valid_stage,
-        "timeline": timeline_stage,
-        "diffusion": img_stage,
-        "render": render_stage
-    }
-
-    planning_stages = [sb_stage, chunk_stage, scene_stage, shot_stage, camera_stage, prompt_stage, valid_stage, timeline_stage]
-    rendering_stages = [img_stage, render_stage]
-    
-    if args.mode == "plan":
-        active_stages = planning_stages
-    elif args.mode == "render":
-        active_stages = rendering_stages
-    elif args.mode == "all":
-        if args.stage != "all":
-            active_stages = [stages_map[args.stage]]
-        else:
-            active_stages = planning_stages + rendering_stages
-
-    router = ContractRouter({})
-    from core.pipeline.resource_manager import ResourceSession
-
-    try:
-        final_context = compiler_context
-        
-        if args.mode in ["plan", "all"] and args.stage == "all":
-            from core.rendering.executor import CompilerExecutor
-            executor_plan = CompilerExecutor(stages=planning_stages, contract_router=router, max_retries=2)
-            with ResourceSession(resources=[llm_provider]):
-                final_context = executor_plan.run(final_context)
-                
-        if args.mode in ["render", "all"] and args.stage == "all":
-            from core.rendering.executor import CompilerExecutor
-            executor_render = CompilerExecutor(stages=rendering_stages, contract_router=router, max_retries=2)
-            with ResourceSession(resources=[diffusion_provider]):
-                final_context = executor_render.run(final_context)
-            
-        if args.stage != "all":
-            from core.rendering.executor import CompilerExecutor
-            executor_single = CompilerExecutor(stages=active_stages, contract_router=router, max_retries=2)
-            with ResourceSession(resources=[llm_provider]): # Best effort for single stage
-                final_context = executor_single.run(final_context)
-
-        
-        # Save intermediate artifacts
-        for node in final_context.execution_nodes:
-            art = node.artifact
-            name = type(art).__name__
-            if name in ["StoryBible", "SceneManifest", "ShotManifest", "PromptManifest", "Timeline"]:
-                workspace.save_json(f"{name}.json", json.loads(art.model_dump_json()))
-                
-        # Save updated registry
-        registry.save(workspace)
-                
-        if args.mode in ["plan", "all"]:
-            from core.reporting.reporter import CompilerReporter
-            reporter = CompilerReporter()
-            report_data = reporter.generate_compile_report(final_context.pipeline)
-            workspace.save_json("compile_report.json", report_data)
-            
-            director_report = reporter.generate_directors_report(final_context.pipeline)
-            with open(workspace.get_output_path("director_report.txt"), "w", encoding="utf-8") as f:
-                f.write(director_report)
-            print("\n" + director_report)
-        
-        # Copy workspace to debug
-        shutil.copytree("workspace", "debug/workspace_run", dirs_exist_ok=True)
-
-        logger.info("\n[SUCCESS] Pipeline execution complete.")
-    except Exception as e:
-        logger.error(f"\n[ERROR] Pipeline execution failed: {e}")
+        parser.print_help()
 
 if __name__ == "__main__":
     main()
