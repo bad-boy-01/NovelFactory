@@ -143,8 +143,11 @@ def main():
     router = ContractRouter({})
     executor = SequentialExecutor(stages=active_stages, contract_router=router, max_retries=2)
 
+    from core.pipeline.resource_manager import ResourceSession
+
     try:
-        final_context = executor.run(context)
+        with ResourceSession(resources=[llm_provider, diffusion_provider]):
+            final_context = executor.run(context)
         
         # Save intermediate artifacts
         for node in final_context.execution_nodes:

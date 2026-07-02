@@ -32,10 +32,7 @@ class SequentialExecutor:
             stage_name = stage.__class__.__name__
             stage_start_time = time.time()
 
-            # Lifecycle: LOAD
-            for provider in stage.get_providers():
-                if hasattr(provider, 'load'):
-                    provider.load()
+            # Note: Provider loading/unloading is now managed externally by ResourceSession.
 
             try:
                 import torch
@@ -63,17 +60,14 @@ class SequentialExecutor:
                         logger.error(f"[FATAL] {stage_name} exhausted all retries.", exc_info=True)
                         raise e
 
-            # Lifecycle: UNLOAD
-            for provider in stage.get_providers():
-                if hasattr(provider, 'unload'):
-                    provider.unload()
-
             stage_duration = time.time() - stage_start_time
             peak_vram = 0.0
+            alloc_vram = 0.0
             try:
                 import torch
                 if torch.cuda.is_available():
                     peak_vram = torch.cuda.max_memory_allocated() / (1024**3)
+                    alloc_vram = torch.cuda.memory_allocated() / (1024**3)
             except ImportError:
                 pass
             
@@ -83,7 +77,7 @@ class SequentialExecutor:
             timeline_logs.append(
                 f"[{i+1}/{len(self.stages)}] {stage_name:<20} {stage_duration:.2f} s\n"
                 f"        Cache: {cache_str}\n"
-                f"        Peak VRAM: {peak_vram:.2f} GB\n"
+                f"        Peak VRAM: {peak_vram:.2f} GB | Alloc VRAM: {alloc_vram:.2f} GB\n"
                 f"        Contracts: PASS\n"
                 f"        Retry: {retries}"
             )
