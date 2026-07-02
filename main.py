@@ -1,8 +1,12 @@
 import argparse
 import logging
 import json
+import sys
 from pathlib import Path
 import shutil
+
+# Force unbuffered output so every print/log line appears immediately in Kaggle
+sys.stdout.reconfigure(line_buffering=True)
 
 from core.pipeline.context import PipelineContext
 from core.domain.story.project import ProjectManifest, ProjectMetadata
@@ -17,7 +21,12 @@ from core.rendering.assembly_stage import FFmpegAssemblyStage
 from core.rendering.executor import SequentialExecutor
 from core.contracts.router import ContractRouter
 
-logging.basicConfig(level=logging.INFO, format='%(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(message)s',
+    stream=sys.stdout,
+    force=True,
+)
 logger = logging.getLogger("NovelFactory")
 
 def save_workspace(name: str, content: str):

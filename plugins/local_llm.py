@@ -2,6 +2,7 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import json
 import re
+import sys
 
 from plugins.interfaces import LLMProvider
 
@@ -73,32 +74,29 @@ class LocalLLMProvider(LLMProvider):
     # -------------------------
     def generate_json(self, prompt: str, schema: dict) -> dict:
 
-        full_prompt = f"""
-You are a strict JSON generator.
+        full_prompt = f"""You are a strict JSON generator. Output ONLY a single valid JSON object.
+Do NOT output a JSON array at the top level.
+Do NOT include any explanation, markdown, or code fences.
+The response must start with {{ and end with }}.
 
-RULES:
-- Output ONLY valid JSON.
-- No explanation.
-- No markdown.
-- Must follow schema exactly.
-
-SCHEMA:
+SCHEMA (the exact keys your object must contain):
 {json.dumps(schema, indent=2)}
 
 TASK:
 {prompt}
 
-OUTPUT:
+JSON OUTPUT:
 """
 
         inputs = self.tokenizer(
-            full_prompt, 
+            full_prompt,
             return_tensors="pt",
             truncation=True,
             max_length=2048
         ).to(self.model.device)
-        
-        print(f"[LLM] Prompt tokenized to {inputs.input_ids.shape[1]} tokens (max 2048).")
+
+        n_prompt_tokens = inputs.input_ids.shape[1]
+        print(f"[LLM] Generating... ({n_prompt_tokens} prompt tokens)", flush=True)
 
         output = self.model.generate(
             **inputs,
@@ -112,7 +110,7 @@ OUTPUT:
         input_length = inputs.input_ids.shape[1]
         new_tokens = output[0][input_length:]
         decoded = self.tokenizer.decode(new_tokens, skip_special_tokens=True)
-        print(f"[LLM] Raw output ({len(decoded)} chars): {decoded[:120]!r}")
+        print(f"[LLM] Raw output ({len(decoded)} chars): {decoded[:120]!r}", flush=True)
 
         json_text = self._extract_json(decoded)
 
