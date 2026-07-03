@@ -187,7 +187,7 @@ JSON OUTPUT:
 
         output = self.model.generate(
             **inputs,
-            max_new_tokens=512,
+            max_new_tokens=2048,
             temperature=temperature,
             top_p=0.9,
             do_sample=True,
@@ -201,6 +201,12 @@ JSON OUTPUT:
 
         json_text = self._extract_json(decoded)
         result = json.loads(json_text)
+        
+        # Validate that the extracted JSON has the expected top-level keys
+        # This prevents the extractor from silently latching onto an inner JSON object (like a single Beat) if the outer JSON is truncated.
+        missing_keys = [k for k in schema.keys() if k not in result]
+        if missing_keys:
+            raise ValueError(f"Extracted JSON is missing required schema keys: {missing_keys}")
         
         # Save to LLM Cache
         with open(cache_file, "w", encoding="utf-8") as f:

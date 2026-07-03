@@ -31,6 +31,7 @@ class DiffusionConfig:
     revision: str = "main"
     dtype: torch.dtype = torch.float16
     cpu_offload: bool = True
+    adapter: str | None = None
 
 class ProviderHealth(BaseModel):
     loaded: bool
