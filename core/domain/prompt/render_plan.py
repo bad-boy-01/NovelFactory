@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from core.domain.base import DomainModel
 
 class LogicalRenderPlan(BaseModel):
@@ -16,7 +16,7 @@ class PhysicalRenderPlan(BaseModel):
     seed: int = 0
     bindings: List[Dict[str, str]] = Field(default_factory=list)
     loras: List[str] = Field(default_factory=list)
-    controlnets: List[str] = Field(default_factory=list)
+    controlnets: Dict[str, Any] = Field(default_factory=dict)
 
 class RenderPlan(DomainModel):
     shot_id: str
