@@ -5,7 +5,8 @@ from core.domain.base import DomainModel
 class PipelineConfig(DomainModel):
     project_id: str = "default_project"
     planning_model: str = "gpt-4o"
-    diffusion_model: str = "sdxl-lightning"
+    llm_model: str = "Qwen/Qwen1.5-4B-Chat"
+    diffusion_model: str = "stabilityai/stable-diffusion-xl-base-1.0"
     render_preset: str = "fast"
     scheduler: str = "euler_a"
     cache: bool = True
@@ -14,4 +15,6 @@ class PipelineConfig(DomainModel):
     resume: bool = True
     num_workers: int = 1
     precision: str = "fp16"
-    cpu_offload: bool = False
+    dtype: str = "float16"
+    cache_dir: str = "workspace/models"
+    cpu_offload: bool = True

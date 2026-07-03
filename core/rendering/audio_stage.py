@@ -47,7 +47,7 @@ class AudioGenerationStage(PipelineStage):
                 text = beat.description
                 
                 # Mock generation
-                filename = f"vo_{hashlib.md5(text.encode('utf-8')).hexdigest()[:8]}.wav"
+                filename = f"{beat.beat_id}.wav"
                 output_path = os.path.join(self.output_dir, filename)
                 
                 duration = self.tts.generate_voice(text=text, voice_id="default", output_path=output_path)

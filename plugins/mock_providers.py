@@ -5,46 +5,79 @@ import logging
 from typing import Dict, Any, List
 from pathlib import Path
 
-from plugins.interfaces import LLMProvider, ImageGeneratorProvider, EvaluatorPlugin, VideoRendererProvider
+from plugins.interfaces import LLMProvider, ImageGenerationProvider, VideoRendererProvider
 from core.pipeline.context import PipelineContext
-from core.domain.assets.execution import Asset, EvaluationResult
+
 
 logger = logging.getLogger(__name__)
 
 class MockLLMProvider(LLMProvider):
-    def generate_json(self, prompt: str, system_prompt: str = "") -> Dict[str, Any]:
+    def generate_json(self, prompt: str, schema: Dict[str, Any]) -> Dict[str, Any]:
         logger.info({"provider": "MockLLMProvider", "event": "generate_json", "prompt_len": len(prompt)})
         
-        # Introduce "trace realism" - occasionally drop color_palette
-        drop_color = random.random() < 0.2
-        
-        chars = [
-            {
-                "name": "Alice",
-                "visual_dna": "young woman, blonde hair, blue eyes",
-                "outfit": "school uniform with a red tie",
-                "color_palette": "blue, red, white" if not drop_color else ""
-            },
-            {
-                "name": "Bob",
-                "visual_dna": "tall man, dark hair, glasses",
-                "outfit": "casual suit",
-                "color_palette": "black, grey"
-            }
-        ]
-        
-        # Occasionally miss a secondary character
-        if random.random() < 0.1:
-            logger.warning({"provider": "MockLLMProvider", "event": "hallucination", "detail": "Dropped character Bob"})
-            chars = [chars[0]]
+        # Look at schema to figure out what to mock
+        schema_str = str(schema)
+        if "translation" in schema_str:
+            # Called by _translate_chinese() in compiler_api.plan()
+            return {"translation": "Mock translated text."}
+        elif "scenes" in schema_str:
+            return {"scenes": [{"scene_id": "mock_scene_1", "characters": ["mock_char_1"], "beats": [{"beat_id": "beat_1", "description": "mock", "emotion": "mock"}]}]}
+        elif "beats" in schema_str:
+            return {"beats": [{"beat_id": "mock_beat_1", "shots": [
+                {"purpose": "mock", "emotion": "mock", "focus": "mock", "importance": "high", "duration": 2.0}
+            ]}]}
+        elif "cast" in schema_str:
+            import re
+            shot_ids = re.findall(r'\[Shot (shot_[^_]+_\d+)\]', prompt)
+            if not shot_ids:
+                shot_ids = ["shot_mock_001"]
+            return {"shots": [
+                {
+                    "shot_id": s_id,
+                    "cast": [
+                        {
+                            "character_id": "mock_char_1",
+                            "emotion": "neutral",
+                            "pose": "standing",
+                            "visibility": "foreground",
+                            "interaction": "none"
+                        }
+                    ]
+                } for s_id in shot_ids
+            ]}
+
+        elif "prompts" in schema_str:
+            return {"prompts": [
+                {
+                    "shot_id": "shot_mock_001",
+                    "ast": {
+                        "subject": {"description": "mock"},
+                        "camera": {"distance": "mock"},
+                        "mood": {"mood": "mock"},
+                        "technical": {"width": 1024, "height": 1024, "steps": 1, "cfg": 7.0}
+                    }
+                }
+            ]}
             
-        return {"characters": chars}
+        return {"characters": [{"name": "mock", "visual_dna": "mock", "outfit": "mock", "color_palette": "mock"}]}
+
+    def initialize(self) -> None:
+        pass
+
+    def load(self) -> None:
+        logger.info({"provider": "MockLLMProvider", "event": "load"})
+
+    def unload(self) -> None:
+        logger.info({"provider": "MockLLMProvider", "event": "unload"})
+
+    def shutdown(self) -> None:
+        pass
 
     def generate_text(self, prompt: str, system_prompt: str = "") -> str:
         return "Mock response text."
 
 
-class MockImageGenerator(ImageGeneratorProvider):
+class MockImageGenerator(ImageGenerationProvider):
     def get_model_name(self) -> str:
         return "mock-diffusion-v1"
 
@@ -68,36 +101,36 @@ class MockImageGenerator(ImageGeneratorProvider):
         return output_path
 
 
-class MockEvaluator(EvaluatorPlugin):
-    def __init__(self, name: str = "MockConsistencyEvaluator"):
-        self.name = name
-
-    def get_name(self) -> str:
-        return self.name
-
-    def evaluate(self, asset: Asset, context: PipelineContext) -> EvaluationResult:
-        logger.info({"provider": "MockEvaluator", "event": "evaluate", "asset": str(asset.file_path)})
-        
-        # Check for simulated corruption
-        if asset.file_path.exists() and asset.file_path.stat().st_size < 1000:
-            return EvaluationResult(score=0.1, reason="Image file is corrupted or too small", retry_needed=True)
-
-        # Vary score to simulate borderline cases
-        score = random.uniform(0.65, 1.0)
-        
-        retry = False
-        reason = "Pass"
-        if score < 0.8:
-            retry = True
-            reason = "Identity drift detected (simulated)"
-            logger.warning({"provider": "MockEvaluator", "event": "failure", "score": score, "reason": reason})
-
-        return EvaluationResult(score=score, reason=reason, retry_needed=retry)
+# class MockEvaluator(EvaluatorPlugin):
+#     def __init__(self, name: str = "MockConsistencyEvaluator"):
+#         self.name = name
+# 
+#     def get_name(self) -> str:
+#         return self.name
+# 
+#     def evaluate(self, asset: Asset, context: PipelineContext) -> EvaluationResult:
+#         logger.info({"provider": "MockEvaluator", "event": "evaluate", "asset": str(asset.file_path)})
+#         
+#         # Check for simulated corruption
+#         if asset.file_path.exists() and asset.file_path.stat().st_size < 1000:
+#             return EvaluationResult(score=0.1, reason="Image file is corrupted or too small", retry_needed=True)
+# 
+#         # Vary score to simulate borderline cases
+#         score = random.uniform(0.65, 1.0)
+#         
+#         retry = False
+#         reason = "Pass"
+#         if score < 0.8:
+#             retry = True
+#             reason = "Identity drift detected (simulated)"
+#             logger.warning({"provider": "MockEvaluator", "event": "failure", "score": score, "reason": reason})
+# 
+#         return EvaluationResult(score=score, reason=reason, retry_needed=retry)
 
 
 class MockVideoRenderer(VideoRendererProvider):
-    def render_video(self, image_paths: List[Path], audio_paths: List[Path], output_path: Path) -> Path:
-        logger.info({"provider": "MockVideoRenderer", "event": "render_video", "frames": len(image_paths)})
+    def render_video(self, manifest: Any, audio_paths: List[Path], output_path: Path) -> Path:
+        logger.info({"provider": "MockVideoRenderer", "event": "render_video", "frames": len(manifest.frames) if hasattr(manifest, 'frames') else 0})
         time.sleep(0.2) # Simulate encoding delay
         
         if random.random() < 0.02:

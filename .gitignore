@@ -68,3 +68,20 @@ venv.bak/
 # Workspace & Tests
 workspace/
 test_script.txt
+
+# Generated project runtime artifacts (audio, images, characters, manifests, reports, cache)
+projects/*/audio/
+projects/*/outputs/
+projects/*/characters/
+projects/*/manifests/
+projects/*/reports/
+projects/*/cache/
+projects/*/.cache/
+
+# Model cache & weights
+*.db
+*.safetensors
+*.bin
+*.pt
+*.pth
+models/

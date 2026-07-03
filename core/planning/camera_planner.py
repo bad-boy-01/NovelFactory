@@ -35,8 +35,7 @@ class CameraPlannerStage(CompilerStage):
             raise ValueError("No ShotManifest found in context.")
             
         enriched_manifest = copy.deepcopy(shot_manifest)
-        enriched_manifest.generator = "CameraPlannerStage"
-        enriched_manifest.generator_version = "1.0.0"
+        # ShotManifest might not have generator fields, skip assignment.
         
         for shot in enriched_manifest.shots:
             purpose = shot.purpose.lower()

@@ -83,9 +83,6 @@ class ImageGenerationProvider(Protocol):
     def load(self) -> None:
         ...
         
-    def generate(self, job: 'RenderJob', callback=None) -> Image.Image:
-        ...
-        
     def health_check(self) -> ProviderHealth:
         ...
         

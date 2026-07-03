@@ -49,8 +49,7 @@ class CastPlannerStage(CompilerStage):
             raise ValueError("CastPlanner requires both SceneManifest and ShotManifest.")
             
         enriched_manifest = copy.deepcopy(shot_manifest)
-        enriched_manifest.generator = "CastPlannerStage"
-        enriched_manifest.generator_version = "1.0.0"
+        # ShotManifest might not have generator fields, skip assignment.
         
         # Build mapping of scene characters
         scene_chars = {}

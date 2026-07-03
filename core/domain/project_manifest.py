@@ -14,3 +14,4 @@ class ProjectManifest(DomainModel):
     default_preset: str = "fast"
     novel_hash: str = ""
     workspace_version: str = "1"
+    source_text: str = ""

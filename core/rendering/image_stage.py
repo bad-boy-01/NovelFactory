@@ -3,6 +3,7 @@ from core.domain.assets.execution import ExecutionNode
 from core.domain.prompt.ast import PromptManifest
 from core.domain.assets.registry import AssetRegistry, Asset
 from core.rendering.render_queue import RenderQueue
+from core.rendering.render_graph import RenderNode, RenderArtifact, RenderGraph
 import logging
 import os
 import json
@@ -43,7 +44,8 @@ class SaveNode(RenderNode):
     def execute(self, inputs: Dict[str, RenderArtifact], config: Dict[str, Any]) -> Dict[str, RenderArtifact]:
         image = inputs["IMAGE"].data
         shot_dir = config["shot_dir"]
-        output_path = str(shot_dir / "image.png")
+        plan = inputs["RENDER_PLAN"].data
+        output_path = str(shot_dir / f"{plan.shot_id}.png")
         image.save(output_path)
         return {"SAVED_IMAGE_PATH": RenderArtifact(kind="PATH", data=output_path)}
 
@@ -65,8 +67,6 @@ class DiffusionRendererStage(PipelineStage):
             from plugins.local_diffusion import DiffusersProvider
             self.diffusion = DiffusersProvider()
             
-        # In the real pipeline, we'd extract a list of RenderPlans.
-        # But we don't have them connected yet, so we just log the action.
         logger.info("Executing DiffusionRendererStage via RenderGraph...")
         
         # Build the graph
@@ -75,14 +75,46 @@ class DiffusionRendererStage(PipelineStage):
         graph.add_node(GenerateNode(self.diffusion))
         graph.add_node(SaveNode())
         
-        # We would loop over RenderPlans here
-        # For now, just return empty registry to preserve interface
+        prompt_manifest = None
+        for node in context.execution_nodes:
+            if isinstance(node.artifact, PromptManifest):
+                prompt_manifest = node.artifact
+                break
+                
+        if not prompt_manifest:
+            raise ValueError("DiffusionRendererStage: Missing PromptManifest.")
+            
+        from core.domain.prompt.render_plan import RenderPlan, LogicalRenderPlan, PhysicalRenderPlan
+        
+        jobs_processed = 0
+        for entry in prompt_manifest.prompts:
+            plan = RenderPlan(
+                shot_id=entry.shot_id,
+                logical=LogicalRenderPlan(
+                    subject=entry.ast.subject.description,
+                    framing=entry.ast.camera.distance,
+                    emphasis="",
+                    mood=entry.ast.mood.mood
+                ),
+                physical=PhysicalRenderPlan(
+                    width=entry.ast.technical.width,
+                    height=entry.ast.technical.height,
+                    steps=entry.ast.technical.steps,
+                    cfg=entry.ast.technical.cfg,
+                    seed=entry.seed
+                )
+            )
+            inputs = {"RENDER_PLAN": RenderArtifact(kind="RENDER_PLAN", data=plan)}
+            config = {"shot_dir": context.workspace.outputs_dir}
+            graph.execute(inputs, config)
+            jobs_processed += 1
+            
         registry = context.registry
         node = ExecutionNode(artifact=registry, stage_name="DiffusionRendererStage")
         
         return StageResult(
             artifact=registry,
             execution_node=node,
-            metrics={"jobs_processed": 0},
+            metrics={"jobs_processed": jobs_processed},
             metadata={}
         )

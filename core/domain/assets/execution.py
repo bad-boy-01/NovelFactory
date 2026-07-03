@@ -47,20 +47,15 @@ class GeneratedImage:
     provenance: Optional[ProvenanceRecord] = None
 
 
-@dataclass(frozen=True)
-class FrameManifestEntry:
-    """A single frame mapped to its chronological position and source."""
-    frame_index: int
-    beat_id: str
+from pydantic import BaseModel
+
+class FrameEntry(BaseModel):
+    shot_id: str
     image_path: Path
-    prompt_hash: str
-    asset_id: str
+    duration: float = 3.0
 
-
-@dataclass(frozen=True)
-class FrameManifest:
-    """The complete manifest consumed by the Renderer."""
-    frames: List[FrameManifestEntry]
+class FrameManifest(BaseModel):
+    frames: List[FrameEntry] = []
 
 
 @dataclass(frozen=True)

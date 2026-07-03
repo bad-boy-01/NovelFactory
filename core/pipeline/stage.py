@@ -26,29 +26,25 @@ class CompilerStage(ABC):
     A single stage in the AI compiler pipeline.
     """
     
-    @abstractmethod
     def get_name(self) -> str:
         """Returns the human-readable name of the stage."""
-        pass
+        return self.__class__.__name__
         
     def get_providers(self) -> list:
         """Returns a list of providers used by this stage, so the executor can manage their lifecycle."""
         return []
         
-    @abstractmethod
     def inputs(self, context: PipelineContext) -> list[Any]:
         """Returns the specific parent artifacts or data this stage depends on."""
-        pass
+        return []
         
-    @abstractmethod
     def outputs(self) -> list[str]:
         """Returns the artifact types or names this stage produces."""
-        pass
+        return []
         
-    @abstractmethod
     def generator_signature(self) -> str:
         """Returns the signature of the generator (e.g. Qwen1.5-4B + PromptBuilder v2.3)."""
-        pass
+        return "default_signature"
         
     def cache_policy(self) -> CachePolicy:
         """Returns the cache policy for this stage. Defaults to FINGERPRINT."""

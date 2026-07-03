@@ -57,7 +57,7 @@ class CompilerExecutor:
                 dep_parts = []
                 for inp in inputs:
                     if hasattr(inp, "metadata"):
-                        dep_parts.append(inp.metadata.fingerprint)
+                        dep_parts.append(getattr(inp.metadata, "fingerprint", str(inp.metadata)))
                     elif hasattr(inp, "fingerprint"):
                         dep_parts.append(inp.fingerprint)
                     else:

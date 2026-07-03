@@ -9,19 +9,24 @@ import gc
 logger = logging.getLogger(__name__)
 
 from core.domain.prompt.render_plan import RenderPlan
-from core.domain.prompt.provider_request import ProviderRequest, ImageRequest
+from core.domain.prompt.provider_request import ProviderRequest
 from plugins.interfaces import ProviderCompiler
 
 class MockCompiler(ProviderCompiler):
     def compile_plan(self, plan: RenderPlan) -> ProviderRequest:
-        return ImageRequest(
-            positive_prompt="Mock Image based on plan",
-            negative_prompt="",
-            width=plan.physical.width,
-            height=plan.physical.height,
-            steps=plan.physical.steps,
-            cfg=plan.physical.cfg,
-            seed=plan.physical.seed
+        from core.domain.prompt.provider_request import GenerationParams, ConditioningParams
+        return ProviderRequest(
+            request_type="image",
+            generation=GenerationParams(
+                resolution=(plan.physical.width, plan.physical.height),
+                steps=plan.physical.steps,
+                cfg=plan.physical.cfg,
+                seed=plan.physical.seed
+            ),
+            conditioning=ConditioningParams(
+                prompt="Mock Image based on plan",
+                negative_prompt=""
+            )
         )
 
 class MockProvider(ImageGenerationProvider):
@@ -32,11 +37,16 @@ class MockProvider(ImageGenerationProvider):
         pass
         
     def generate(self, request: ProviderRequest, callback=None) -> Image.Image:
-        logger.info(f"Mock Generating: {getattr(request, 'positive_prompt', 'Mock')}...")
+        prompt = request.conditioning.prompt if request.conditioning else "Mock"
+        steps = request.generation.steps if request.generation else 10
+        width = request.generation.resolution[0] if request.generation else 1024
+        height = request.generation.resolution[1] if request.generation else 1024
+        
+        logger.info(f"Mock Generating: {prompt}...")
         if callback:
-            for i in range(getattr(request, 'steps', 10)):
-                callback(i, getattr(request, 'steps', 10))
-        return Image.new('RGB', (getattr(request, 'width', 1024), getattr(request, 'height', 1024)), color='green')
+            for i in range(steps):
+                callback(i, steps)
+        return Image.new('RGB', (width, height), color='green')
         
     def health_check(self) -> ProviderHealth:
         return ProviderHealth(loaded=True, device="cpu", model="mock", dtype="none", vram_allocated_gb=0.0)
@@ -68,16 +78,23 @@ class DiffusersCompiler(ProviderCompiler):
         prompt_str = " ".join(sections)
         negative_str = "low quality, blurry, distorted, bad anatomy, watermark"
         
-        return ImageRequest(
-            positive_prompt=prompt_str,
-            negative_prompt=negative_str,
-            width=plan.physical.width,
-            height=plan.physical.height,
-            steps=plan.physical.steps,
-            cfg=0.0 if self.config and self.config.adapter and "Lightning" in self.config.adapter else plan.physical.cfg,
-            seed=plan.physical.seed,
-            loras=plan.physical.loras,
-            controlnets=plan.physical.controlnets
+        from core.domain.prompt.provider_request import GenerationParams, ConditioningParams, BindingParams
+        return ProviderRequest(
+            request_type="image",
+            generation=GenerationParams(
+                resolution=(plan.physical.width, plan.physical.height),
+                steps=plan.physical.steps,
+                cfg=0.0 if self.config and self.config.adapter and "Lightning" in self.config.adapter else plan.physical.cfg,
+                seed=plan.physical.seed
+            ),
+            conditioning=ConditioningParams(
+                prompt=prompt_str,
+                negative_prompt=negative_str,
+                controlnets=plan.physical.controlnets
+            ),
+            bindings=BindingParams(
+                loras=plan.physical.loras
+            )
         )
 
 class DiffusersProvider(ImageGenerationProvider):
@@ -92,22 +109,22 @@ class DiffusersProvider(ImageGenerationProvider):
             self.load()
             
         import torch
-        generator = torch.Generator(device=self.device).manual_seed(request.seed)
+        generator = torch.Generator(device=self.device).manual_seed(request.generation.seed)
         
-        logger.info(f"[Inference] Running generation for seed {request.seed} with {request.steps} steps.")
+        logger.info(f"[Inference] Running generation for seed {request.generation.seed} with {request.generation.steps} steps.")
         
         def step_callback(step: int, timestep: int, latents: torch.Tensor):
             if callback:
-                callback(step, request.steps)
+                callback(step, request.generation.steps)
                 
         image = self.pipeline(
-            prompt=request.positive_prompt,
-            negative_prompt=request.negative_prompt,
-            num_inference_steps=request.steps,
-            guidance_scale=request.cfg,
+            prompt=request.conditioning.prompt,
+            negative_prompt=request.conditioning.negative_prompt,
+            num_inference_steps=request.generation.steps,
+            guidance_scale=request.generation.cfg,
             generator=generator,
-            width=request.width,
-            height=request.height,
+            width=request.generation.resolution[0],
+            height=request.generation.resolution[1],
             callback=step_callback,
             callback_steps=1
         ).images[0]

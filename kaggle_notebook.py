@@ -21,7 +21,24 @@ All cells are idempotent — safe to re-run.
 """
 import subprocess, sys, os
 
-# ── 1a. Verify GPU ────────────────────────────────────────────────────────────
+# ── 1a. Point HuggingFace cache to pre-attached Kaggle model datasets ─────────
+# This MUST run before any `import transformers` / `import diffusers` call,
+# because those libraries resolve the cache directory at import time.
+#
+# How to attach models (Kaggle notebook sidebar → Data → Add Dataset):
+#   • Search for "Qwen/Qwen1.5-4B-Chat" in the Models tab
+#     → attach it; it will appear at /kaggle/input/qwen1-5-4b-chat/
+#   • Search for "stabilityai/stable-diffusion-xl-base-1.0" in the Models tab
+#     → attach it; it will appear at /kaggle/input/stable-diffusion-xl-base-1-0/
+#
+# If you're running without pre-attached datasets, comment these four lines out
+# and models will download to /root/.cache/huggingface (counts against RAM).
+os.environ["TRANSFORMERS_CACHE"] = "/kaggle/input/qwen1-5-4b-chat"
+os.environ["HF_HOME"]            = "/kaggle/input/qwen1-5-4b-chat"
+os.environ["HUGGINGFACE_HUB_CACHE"] = "/kaggle/input/qwen1-5-4b-chat"
+os.environ["DIFFUSERS_CACHE"]    = "/kaggle/input/stable-diffusion-xl-base-1-0"
+
+# ── 1b. Verify GPU ────────────────────────────────────────────────────────────
 import torch
 print(f"CUDA available : {torch.cuda.is_available()}")
 if torch.cuda.is_available():
@@ -55,6 +72,21 @@ print("\\n✅ Environment ready.")
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 import os, sys
+
+# ── PREREQUISITE: Attach model datasets BEFORE running this notebook ──────────
+# In the Kaggle sidebar: "Data" → "+ Add Data" → search the Models tab
+#
+#   1. Qwen/Qwen1.5-4B-Chat
+#      Kaggle slug: qwen1-5-4b-chat
+#      Will appear at: /kaggle/input/qwen1-5-4b-chat/
+#
+#   2. stabilityai/stable-diffusion-xl-base-1.0
+#      Kaggle slug: stable-diffusion-xl-base-1-0
+#      Will appear at: /kaggle/input/stable-diffusion-xl-base-1-0/
+#
+# After attaching, the os.environ lines in Cell 1 point HuggingFace directly
+# there — no download occurs, no RAM is consumed during load.
+# ─────────────────────────────────────────────────────────────────────────────
 
 # ── Option A: GitHub clone (if repo is public) ────────────────────────────────
 # Uncomment and fill in your repo URL:
