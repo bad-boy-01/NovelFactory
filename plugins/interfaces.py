@@ -1,4 +1,5 @@
-from typing import Protocol, Dict, Any, List, TYPE_CHECKING
+from __future__ import annotations
+from typing import Protocol, Dict, Any, List, TYPE_CHECKING, Callable
 from pathlib import Path
 from pydantic import BaseModel
 
