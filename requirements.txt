@@ -1,11 +1,15 @@
+# ── Already on Kaggle (pinned here as minimum-version guards) ─────────────────
 torch
 transformers>=4.40
+diffusers>=0.27.0
 accelerate
-bitsandbytes>=0.46.1
-diffusers
-safetensors
-sentencepiece
-huggingface_hub
-python-docx
-pydantic
-typing-extensions
+
+# ── Must install (not on Kaggle by default) ──────────────────────────────────
+bitsandbytes>=0.46.1   # 4-bit quantisation for Qwen
+safetensors            # fast model checkpoint loading
+sentencepiece          # Qwen tokenizer
+huggingface_hub        # model/dataset download utilities
+pillow                 # image generation (PIL.Image.save)
+pydantic>=2.0          # domain models (v2 required)
+typing-extensions      # backport for older Python versions
+python-docx            # optional: .docx novel input support
