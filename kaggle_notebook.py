@@ -21,22 +21,25 @@ All cells are idempotent — safe to re-run.
 """
 import subprocess, sys, os
 
-# ── 1a. Point HuggingFace cache to pre-attached Kaggle model datasets ─────────
-# This MUST run before any `import transformers` / `import diffusers` call,
-# because those libraries resolve the cache directory at import time.
+# ── 1a. HuggingFace cache — MUST be a WRITABLE directory ─────────────────────
+# /kaggle/input/ is READ-ONLY — setting HF_HOME there causes a crash when
+# transformers tries to write its cache index file.
+# We use /kaggle/working/hf_cache/ for HF metadata (writable, ~20 GB space).
+# The actual model weights are loaded directly from /kaggle/input/ by the
+# _find_kaggle_model() helper in local_llm.py using local_files_only=True.
 #
-# How to attach models (Kaggle notebook sidebar → Data → Add Dataset):
-#   • Search for "Qwen/Qwen1.5-4B-Chat" in the Models tab
-#     → attach it; it will appear at /kaggle/input/qwen1-5-4b-chat/
-#   • Search for "stabilityai/stable-diffusion-xl-base-1.0" in the Models tab
-#     → attach it; it will appear at /kaggle/input/stable-diffusion-xl-base-1-0/
-#
-# If you're running without pre-attached datasets, comment these four lines out
-# and models will download to /root/.cache/huggingface (counts against RAM).
-os.environ["TRANSFORMERS_CACHE"] = "/kaggle/input/qwen1-5-4b-chat"
-os.environ["HF_HOME"]            = "/kaggle/input/qwen1-5-4b-chat"
-os.environ["HUGGINGFACE_HUB_CACHE"] = "/kaggle/input/qwen1-5-4b-chat"
-os.environ["DIFFUSERS_CACHE"]    = "/kaggle/input/stable-diffusion-xl-base-1-0"
+# How to attach models (Kaggle sidebar → Data → + Add Data → Models tab):
+#   • "Qwen/Qwen1.5-4B-Chat"                    → attaches to /kaggle/input/qwen1-5-4b-chat/
+#   • "stabilityai/stable-diffusion-xl-base-1.0" → attaches to /kaggle/input/stable-diffusion-xl-base-1-0/
+import os
+os.makedirs("/kaggle/working/hf_cache", exist_ok=True)
+os.environ["HF_HOME"]               = "/kaggle/working/hf_cache"
+os.environ["TRANSFORMERS_CACHE"]    = "/kaggle/working/hf_cache"
+os.environ["HUGGINGFACE_HUB_CACHE"] = "/kaggle/working/hf_cache"
+os.environ["DIFFUSERS_CACHE"]       = "/kaggle/working/hf_cache"
+# Tell local_llm.py where the Kaggle model datasets are mounted:
+os.environ["KAGGLE_LLM_INPUT"]      = "/kaggle/input/qwen1-5-4b-chat"
+os.environ["KAGGLE_SDXL_INPUT"]     = "/kaggle/input/stable-diffusion-xl-base-1-0"
 
 # ── 1b. Verify GPU ────────────────────────────────────────────────────────────
 import torch

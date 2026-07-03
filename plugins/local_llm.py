@@ -15,22 +15,71 @@ class LocalLLMProvider(LLMProvider):
         self.model = None
 
     # -------------------------
+    # KAGGLE LOCAL PATH RESOLVER
+    # -------------------------
+    def _find_kaggle_model(self) -> tuple:
+        """
+        When running on Kaggle with a model dataset attached, the weights are
+        in /kaggle/input/<slug>/ which is READ-ONLY.  We must load directly
+        from that path using local_files_only=True — never set HF_HOME there.
+
+        Strategy:
+          1. Check KAGGLE_LLM_INPUT env var (set by Cell 1 of kaggle_notebook.py)
+          2. Derive slug from model_id  (e.g. Qwen/Qwen1.5-4B-Chat → qwen1-5-4b-chat)
+          3. Walk up to 4 levels deep looking for config.json
+          4. Return (resolved_path, True) if found, else (self.model_id, False)
+        """
+        import os
+        from pathlib import Path
+
+        # Candidate root directories to search
+        candidates = []
+        env_path = os.environ.get("KAGGLE_LLM_INPUT", "")
+        if env_path:
+            candidates.append(env_path)
+
+        # Also try the slug derived from model_id
+        slug = self.model_id.lower().replace("/", "-").replace(".", "-").replace("_", "-")
+        candidates.append(f"/kaggle/input/{slug}")
+
+        for base in candidates:
+            base_path = Path(base)
+            if not base_path.is_dir():
+                continue
+            # Search up to 4 levels for config.json
+            for depth in range(5):
+                pattern = "/".join(["*"] * depth) + "/config.json" if depth > 0 else "config.json"
+                matches = list(base_path.glob(pattern))
+                if matches:
+                    model_dir = str(matches[0].parent)
+                    print(f"[LLM] Found Kaggle model at: {model_dir}")
+                    return model_dir, True
+
+        return self.model_id, False
+
+    # -------------------------
     # LOAD MODEL (VRAM CONTROLLED)
     # -------------------------
     def initialize(self):
         print("[LLM] Initializing tokenizer and config (No VRAM penalty)...")
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_id, trust_remote_code=True)
-        # In a real system, you might load config here too.
+        model_path, local_only = self._find_kaggle_model()
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_path,
+            trust_remote_code=True,
+            local_files_only=local_only,
+        )
 
     def load(self):
         if self.model is not None:
             print("[Resource] Reusing resident LLM.")
             return
-            
+
         print("[Resource] Loading LLM weights into VRAM...")
         if not self.tokenizer:
             self.initialize()
-            
+
+        model_path, local_only = self._find_kaggle_model()
+
         try:
             import bitsandbytes
             from transformers import BitsAndBytesConfig
@@ -46,17 +95,19 @@ class LocalLLMProvider(LLMProvider):
 
         if bnb_config:
             self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_id,
+                model_path,
                 quantization_config=bnb_config,
                 device_map="auto",
-                trust_remote_code=True
+                trust_remote_code=True,
+                local_files_only=local_only,
             )
         else:
             self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_id,
+                model_path,
                 torch_dtype=torch.float16,
                 device_map="auto",
-                trust_remote_code=True
+                trust_remote_code=True,
+                local_files_only=local_only,
             )
 
     def unload(self):
@@ -72,6 +123,7 @@ class LocalLLMProvider(LLMProvider):
         if self.tokenizer:
             del self.tokenizer
             self.tokenizer = None
+
 
     # -------------------------
     # JSON GENERATION CORE
