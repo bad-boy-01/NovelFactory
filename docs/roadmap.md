@@ -2,6 +2,15 @@
 
 With the compiler architecture formally frozen in Milestone 9, NovelFactory transitions entirely from building **infrastructure** to delivering **capabilities**. No further changes will be made to upstream planning stages (`StoryBible` -> `RenderPlan`) to support new models. Future work is strictly focused on improving visual quality, generation speed, and model support through plugins.
 
+## The Ultimate Vision
+Given a long-form novel, NovelFactory automatically compiles a 2–3 hour cinematic video with **zero manual editing**, designed specifically for headless execution on Kaggle's free GPU tier.
+
+### Target Aesthetic: Korean Manhwa / Webtoon
+Unlike typical AI video generators aiming for realism or Pixar styles, NovelFactory targets the high-polish, motion-comic aesthetic of Korean webtoons (e.g., *Solo Leveling*, *Omniscient Reader*). Every frame should feel like a perfectly composed manhwa panel.
+
+### The Great Challenge: Continuity at Scale
+Generating a 3-hour slideshow requires 1,500–3,000 images. The primary technical hurdle is preventing drift—keeping faces, clothing, lighting, and environments consistent across thousands of discrete generations. Our compiler architecture (`StoryBible`, `SceneGraph`, `RenderPlan`) exists entirely to fight this drift through deterministic planning.
+
 ## Milestone 10: Model Ecosystem
 **Goal:** Expand provider plugins to support the state-of-the-art open-weight landscape.
 - **Image Models:** SDXL Turbo, FLUX Dev/Schnell, SD3, PixArt Sigma.
