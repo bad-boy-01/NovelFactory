@@ -79,6 +79,10 @@ Text (Chapter {chunk.chapter}):
             
             for s in result_dict.get("scenes", []):
                 beats = [Beat(**b) for b in s.get("beats", [])]
+                if not beats:
+                    logger.warning("LLM generated a scene with no beats, injecting fallback beat.")
+                    beats = [Beat(beat_id="beat_mock_001", description="Fallback scene action.", emotion="Neutral")]
+
                 
                 chap = s.get("chapter", chunk.chapter)
                 start = s.get("start_offset", chunk.start_char)

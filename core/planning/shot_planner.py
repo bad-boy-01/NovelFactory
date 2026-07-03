@@ -91,6 +91,10 @@ Beats:
                 logger.warning(f"LLM shot coverage extraction failed for scene {scene.scene_id}, falling back.")
                 result_dict = {"beats": []}
                 
+            if not result_dict.get("beats"):
+                logger.warning(f"LLM generated no shots, injecting fallback shot for scene {scene.scene_id}")
+                result_dict = {"beats": [{"shots": [{"purpose": "establishing", "emotion": "neutral", "importance": "high", "focus": "environment", "duration": 3.0}]}]}
+                
             shot_idx = 0
             for beat_cov in result_dict.get("beats", []):
                 for shot_data in beat_cov.get("shots", []):
